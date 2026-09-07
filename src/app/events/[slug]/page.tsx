@@ -16,8 +16,9 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
   const router = useRouter();
 
   useEffect(() => {
+    let channel: any;
+
     async function fetchEventAndPhotos() {
-      // 1. Récupérer l'événement via son slug
       const { data: eventData, error: eventError } = await supabase
         .from('events')
         .select('*')
@@ -31,7 +32,6 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
 
       setEvent(eventData);
 
-      // 2. Récupérer les photos associées à cet événement
       const { data: photosData } = await supabase
         .from('photos')
         .select('*')
@@ -44,8 +44,7 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
 
       setLoading(false);
 
-      // 3. Activer l'écoute Realtime pour les nouvelles photos
-      const channel = supabase
+      channel = supabase
         .channel(`public:photos:event_id=eq.${eventData.id}`)
         .on(
           'postgres_changes',
@@ -55,18 +54,20 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
             table: 'photos',
             filter: `event_id=eq.${eventData.id}`,
           },
-          (payload) => {
+          (payload: { new: any }) => {
             setPhotos((prevPhotos) => [payload.new, ...prevPhotos]);
           }
         )
         .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
     }
 
     fetchEventAndPhotos();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, [slug, router]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -78,21 +79,18 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random().toString(36.substring(2))}.${fileExt}`;
+      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
       const filePath = `${event.id}/${fileName}`;
 
-      // Upload du fichier dans le bucket Storage de Supabase (suppose un bucket nommé 'event-photos')
       const { error: uploadError } = await supabase.storage
         .from('event-photos')
         .upload(filePath, file);
 
       if (!uploadError) {
-        // Récupération de l'URL publique de l'image
         const { data: publicUrlData } = supabase.storage
           .from('event-photos')
           .getPublicUrl(filePath);
 
-        // Enregistrement de la photo dans la table 'photos'
         await supabase.from('photos').insert([
           {
             event_id: event.id,
@@ -116,8 +114,6 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
   return (
     <main className="min-h-screen bg-slate-950 text-white p-6 md:p-12">
       <div className="max-w-6xl mx-auto space-y-8">
-        
-        {/* En-tête */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl gap-4">
           <div>
             <span className="text-xs uppercase tracking-wider text-purple-400 font-semibold">Galerie Live KlicEvent</span>
@@ -144,7 +140,6 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
           </div>
         </div>
 
-        {/* Grille des photos en temps réel */}
         {photos.length === 0 ? (
           <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-16 text-center space-y-3">
             <p className="text-xl text-slate-400 font-medium">Aucune photo pour le moment.</p>
