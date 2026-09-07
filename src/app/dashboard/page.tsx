@@ -22,7 +22,6 @@ export default function DashboardPage() {
 
       setUser(session.user);
 
-      // Récupérer les événements liés à cet utilisateur ou par son e-mail
       const { data: eventsData, error } = await supabase
         .from('events')
         .select('*')
@@ -42,6 +41,44 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/');
+  };
+
+  // Fonction pour supprimer un événement depuis le dashboard
+  const handleDeleteEvent = async (eventId: string, eventTitle: string) => {
+    if (!confirm(`Voulez-vous vraiment supprimer l'événement "${eventTitle}" et toutes ses photos ?`)) {
+      return;
+    }
+
+    try {
+      // 1. Récupérer toutes les photos associées à l'événement pour les supprimer du stockage
+      const { data: photosData } = await supabase
+        .from('photos')
+        .select('url')
+        .eq('event_id', eventId);
+
+      if (photosData && photosData.length > 0) {
+        for (const photo of photosData) {
+          const urlParts = photo.url.split('/event-photos/');
+          if (urlParts.length > 1) {
+            await supabase.storage.from('event-photos').remove([urlParts[1]]);
+          }
+        }
+      }
+
+      // 2. Supprimer les enregistrements de la table photos
+      await supabase.from('photos').delete().eq('event_id', eventId);
+
+      // 3. Supprimer l'événement de la table events
+      const { error } = await supabase.from('events').delete().eq('id', eventId);
+
+      if (error) throw error;
+
+      // 4. Mettre à jour l'état local
+      setEvents((prev) => prev.filter((evt) => evt.id !== eventId));
+    } catch (err) {
+      console.error("Erreur lors de la suppression de l'événement :", err);
+      alert("Impossible de supprimer l'événement.");
+    }
   };
 
   if (loading) {
@@ -102,7 +139,7 @@ export default function DashboardPage() {
               {events.map((evt) => (
                 <div
                   key={evt.id}
-                  className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between space-y-4"
+                  className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between space-y-4 relative group"
                 >
                   <div className="space-y-2">
                     <div className="flex justify-between items-start">
@@ -124,6 +161,13 @@ export default function DashboardPage() {
                     >
                       Voir la galerie →
                     </Link>
+
+                    <button
+                      onClick={() => handleDeleteEvent(evt.id, evt.title)}
+                      className="text-xs px-3 py-1.5 bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800/50 rounded-lg transition cursor-pointer"
+                    >
+                      Supprimer
+                    </button>
                   </div>
                 </div>
               ))}
