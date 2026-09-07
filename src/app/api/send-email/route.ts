@@ -5,26 +5,33 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: Request) {
   try {
-    const { email, eventTitle, eventSlug } = await request.json();
-    const eventUrl = `http://localhost:3000/events/${eventSlug}`;
+    const { email, title, slug } = await request.json();
+
+    const eventUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://klic-event-3qvk.vercel.app'}/events/${slug}`;
+    const uploadUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://klic-event-3qvk.vercel.app'}/upload?event=${slug}`;
 
     const data = await resend.emails.send({
-      from: 'Galerie Événement <onboarding@resend.dev>',
+      from: 'KlicEvent <onboarding@resend.dev>', // Ou ton domaine personnalisé une fois validé
       to: [email],
-      subject: `Accès à votre galerie : ${eventTitle}`,
+      subject: `📸 Votre événement "${title}" est créé !`,
       html: `
-        <div style="font-family: sans-serif; color: #333;">
-          <h2>Votre galerie est prête !</h2>
+        <div style="font-family: sans-serif; background-color: #020617; color: #ffffff; padding: 32px; border-radius: 12px;">
+          <h1 style="color: #c084fc; font-size: 24px;">KlicEvent 📸</h1>
           <p>Bonjour,</p>
-          <p>Votre événement <strong>${eventTitle}</strong> a bien été configuré.</p>
-          <p>Vous pouvez dès à présent consulter votre galerie, partager le QR code et récupérer vos souvenirs ici :</p>
-          <a href="${eventUrl}" style="display: inline-block; background: #7c3aed; color: #fff; padding: 12px 20px; text-decoration: none; border-radius: 8px; margin-top: 10px;">Accéder à ma galerie</a>
+          <p>Votre espace photo pour l'événement <strong>${title}</strong> est prêt à l'emploi.</p>
+          
+          <div style="background-color: #0f172a; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #1e293b;">
+            <p style="margin: 0 0 10px 0;">🔗 <strong>Lien de gestion (Galerie & QR Code) :</strong><br><a href="${eventUrl}" style="color: #c084fc; word-break: break-all;">${eventUrl}</a></p>
+            <p style="margin: 15px 0 0 0;">📤 <strong>Lien de dépôt pour vos invités :</strong><br><a href="${uploadUrl}" style="color: #38bdf8; word-break: break-all;">${uploadUrl}</a></p>
+          </div>
+
+          <p style="font-size: 14px; color: #94a3b8;">Conservez bien cet e-mail pour retrouver votre événement à tout moment. Bon événement !</p>
         </div>
       `,
     });
 
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    return NextResponse.json({ error }, { status: 500 });
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }

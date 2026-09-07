@@ -49,13 +49,23 @@ export default function HomePage() {
       console.error("Erreur création :", error);
       alert("Erreur lors de la création de l'événement.");
     } else {
+      // Envoi de l'e-mail récapitulatif en arrière-plan
+      fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userEmail,
+          title: title,
+          slug: slug,
+        }),
+      }).catch((err) => console.error("Erreur d'envoi d'email :", err));
+
       router.push(`/events/${slug}`);
     }
   };
 
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 relative">
-      {/* Bouton de navigation haut-droite selon l'état de connexion */}
       <div className="absolute top-6 right-6">
         {user ? (
           <Link href="/dashboard" className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-sm font-medium rounded-lg transition shadow-lg">
