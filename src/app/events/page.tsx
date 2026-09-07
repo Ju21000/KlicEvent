@@ -55,7 +55,7 @@ export default function EventsListPage() {
 
       const data = await response.json();
       if (data.url) {
-        window.location.href = data.url; // Redirection vers Stripe Checkout
+        window.location.href = data.url;
       } else {
         throw new Error(data.error || "Erreur lors de la création de la session de paiement.");
       }
@@ -73,12 +73,20 @@ export default function EventsListPage() {
           <h1 className="text-3xl font-bold text-purple-400">
             Mes Événements 📸
           </h1>
-          <Link
-            href="/create-event"
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition duration-200"
-          >
-            + Nouvel événement
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 text-sm font-medium rounded-lg border border-slate-800 transition duration-200"
+            >
+              Connexion Organisateur
+            </Link>
+            <Link
+              href="/create-event"
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition duration-200"
+            >
+              + Nouvel événement
+            </Link>
+          </div>
         </div>
 
         {loading && (
