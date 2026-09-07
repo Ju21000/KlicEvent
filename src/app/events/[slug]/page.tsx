@@ -13,8 +13,6 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
   const [photos, setPhotos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [isSlideshowOpen, setIsSlideshowOpen] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -83,16 +81,6 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
       }
     };
   }, [slug, router]);
-
-  // Diaporama automatique plein écran toutes les 4 secondes
-  useEffect(() => {
-    if (isSlideshowOpen && photos.length > 0) {
-      const interval = setInterval(() => {
-        setCurrentIndex((prevIndex) => (prevIndex + 1) % photos.length);
-      }, 4000);
-      return () => clearInterval(interval);
-    }
-  }, [isSlideshowOpen, photos.length]);
 
   // Upload sécurisé avec vérification de l'existence de l'événement en base
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -163,15 +151,7 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
 
       if (error) throw error;
 
-      setPhotos((prev) => {
-        const updated = prev.filter((p) => p.id !== photoId);
-        if (updated.length === 0) {
-          setIsSlideshowOpen(false);
-        } else if (currentIndex >= updated.length) {
-          setCurrentIndex(updated.length - 1);
-        }
-        return updated;
-      });
+      setPhotos((prev) => prev.filter((p) => p.id !== photoId));
     } catch (err) {
       console.error("Erreur lors de la suppression :", err);
       alert("Impossible de supprimer la photo.");
@@ -191,24 +171,26 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
       <div className="max-w-6xl mx-auto space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl gap-4">
           <div>
-            <span className="text-xs uppercase tracking-wider text-purple-400 font-semibold">Galerie Live KlicEvent</span>
+            <span className="text-xs uppercase tracking-wider text-purple-400 font-semibold">
+              Galerie & Modération
+            </span>
             <h1 className="text-3xl font-bold mt-1">{event.title}</h1>
+            <p className="text-xs text-slate-400 mt-1">
+              {photos.length} photo{photos.length > 1 ? 's' : ''} partagée{photos.length > 1 ? 's' : ''}
+            </p>
           </div>
-          
+
           <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
-            <button
-              onClick={() => {
-                setCurrentIndex(0);
-                setIsSlideshowOpen(true);
-              }}
-              disabled={photos.length === 0}
-              className="px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-xl transition shadow-lg cursor-pointer disabled:opacity-50"
+            <Link
+              href={`/events/${slug}/slideshow`}
+              target="_blank"
+              className="px-4 py-3 bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold rounded-xl transition shadow-lg flex items-center gap-2"
             >
-              🎬 Diaporama Plein Écran
-            </button>
+              📺 Lancer le Live
+            </Link>
 
             <label className="text-center px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium rounded-xl transition border border-slate-700 cursor-pointer">
-              {uploading ? 'Envoi...' : '📸 Photo'}
+              {uploading ? 'Envoi...' : '📸 Ajouter une photo'}
               <input
                 type="file"
                 accept="image/*"
@@ -218,6 +200,7 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
                 className="hidden"
               />
             </label>
+
             <Link
               href="/dashboard"
               className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl transition border border-slate-700"
@@ -227,11 +210,13 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
           </div>
         </div>
 
-        {/* Grille principale des photos */}
+        {/* Grille principale des photos pour modération */}
         {photos.length === 0 ? (
           <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-16 text-center space-y-3">
             <p className="text-xl text-slate-400 font-medium">Aucune photo pour le moment.</p>
-            <p className="text-sm text-slate-500">Sois le premier à immortaliser un moment de cet événement !</p>
+            <p className="text-sm text-slate-500">
+              Les photos envoyées par les invités apparaîtront ici en temps réel.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
@@ -241,17 +226,14 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
                 className="relative aspect-square rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 shadow-xl group"
               >
                 <img
-                  src={photo.url}
+                  src={photo.url || photo.image_url}
                   alt="Photo de l'événement"
                   className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                 />
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeletePhoto(photo.id, photo.url);
-                  }}
+                  onClick={() => handleDeletePhoto(photo.id, photo.url || photo.image_url)}
                   title="Supprimer la photo"
-                  className="absolute top-3 right-3 bg-red-600/80 hover:bg-red-600 text-white w-9 h-9 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-lg cursor-pointer"
+                  className="absolute top-3 right-3 bg-red-600/90 hover:bg-red-600 text-white w-9 h-9 rounded-xl flex items-center justify-center opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition shadow-lg cursor-pointer"
                 >
                   🗑️
                 </button>
@@ -260,55 +242,6 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
           </div>
         )}
       </div>
-
-      {/* Modal Plein Écran Diaporama */}
-      {isSlideshowOpen && photos.length > 0 && (
-        <div className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-between p-6">
-          <div className="w-full max-w-7xl flex justify-between items-center text-white">
-            <h2 className="text-xl font-bold">{event.title} (Diaporama Live)</h2>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => handleDeletePhoto(photos[currentIndex].id, photos[currentIndex].url)}
-                className="bg-red-600/80 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold border border-red-500 transition cursor-pointer"
-              >
-                🗑️ Supprimer cette photo
-              </button>
-              <button
-                onClick={() => setIsSlideshowOpen(false)}
-                className="bg-slate-800/80 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-sm font-bold border border-slate-700 transition cursor-pointer"
-              >
-                Fermer ✕
-              </button>
-            </div>
-          </div>
-
-          <div className="relative flex-1 w-full max-w-6xl max-h-[80vh] flex items-center justify-center my-4">
-            <img
-              src={photos[currentIndex]?.url}
-              alt="Diaporama plein écran"
-              className="max-h-full max-w-full object-contain rounded-2xl shadow-2xl transition-all duration-500"
-            />
-          </div>
-
-          <div className="w-full max-w-xl flex items-center justify-between text-slate-400 text-sm">
-            <button
-              onClick={() => setCurrentIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1))}
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl border border-slate-800 transition cursor-pointer"
-            >
-              ← Précédent
-            </button>
-            <span>
-              Photo {currentIndex + 1} / {photos.length}
-            </span>
-            <button
-              onClick={() => setCurrentIndex((prev) => (prev + 1) % photos.length)}
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl border border-slate-800 transition cursor-pointer"
-            >
-              Suivant →
-            </button>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
