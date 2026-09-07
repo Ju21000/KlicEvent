@@ -6,9 +6,10 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 export async function POST(request: Request) {
   try {
     const { title, date, formula } = await request.json();
-    const origin = request.headers.get('origin') || 'https://klic-event-3qvk.vercel.app';
+    const origin = 'https://klic-event-3qvk.vercel.app';
 
-    const unitAmount = formula === 'standard' ? 1500 : 0;
+    // 2900 centimes = 29,00 € pour la formule illimitée, 0 pour la démo
+    const unitAmount = formula === 'standard' ? 2900 : 0;
 
     if (unitAmount === 0) {
       return NextResponse.json({ url: `${origin}/events/success?session_id=free_demo` });
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
           price_data: {
             currency: 'eur',
             product_data: {
-              name: `KlicEvent - ${title}`,
+              name: `KlicEvent - ${title} (Formule Illimitée)`,
             },
             unit_amount: unitAmount,
           },
