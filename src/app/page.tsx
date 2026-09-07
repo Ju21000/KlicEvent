@@ -1,108 +1,114 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
-export default function HomePage() {
-  const [title, setTitle] = useState('');
+export default function Home() {
+  const [eventTitle, setEventTitle] = useState('');
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
   const router = useRouter();
-
-  useEffect(() => {
-    async function checkUser() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setUser(session.user);
-      }
-    }
-    checkUser();
-  }, []);
 
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!eventTitle.trim()) return;
 
     setLoading(true);
-    const slug = Math.random().toString(36).substring(2, 10);
 
-    const userId = user ? user.id : null;
-    const userEmail = user ? user.email : 'anonyme@klic-event.com';
+    const slug = eventTitle
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '') + '-' + Math.random().toString(36).substring(2, 6);
 
-    // Insertion de l'événement avec liaison utilisateur
-    const { error } = await supabase.from('events').insert([
-      {
-        slug: slug,
-        title: title,
-        client_email: userEmail,
-        user_id: userId,
-        plan_type: 'demo',
-        is_paid: false
-      }
-    ]);
+    const { data: { session } } = await supabase.auth.getSession();
 
-    setLoading(false);
+    const { data, error } = await supabase
+      .from('events')
+      .insert([
+        {
+          title: eventTitle,
+          slug: slug,
+          user_id: session ? session.user.id : null,
+          plan_type: 'demo',
+          payment_status: 'pending',
+        },
+      ])
+      .select()
+      .single();
 
     if (error) {
-      console.error("Erreur création :", error);
-      alert("Erreur lors de la création de l'événement.");
-    } else {
-      // Envoi de l'e-mail récapitulatif en arrière-plan
-      fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: userEmail,
-          title: title,
-          slug: slug,
-        }),
-      }).catch((err) => console.error("Erreur d'envoi d'email :", err));
-
-      router.push(`/events/${slug}`);
+      console.error("Erreur lors de la création :", error);
+      alert("Impossible de créer l'événement.");
+      setLoading(false);
+      return;
     }
+
+    router.push(`/create-event?eventId=${data.id}`);
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 relative">
-      <div className="absolute top-6 right-6">
-        {user ? (
-          <Link href="/dashboard" className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-sm font-medium rounded-lg transition shadow-lg">
-            Mon Dashboard →
-          </Link>
-        ) : (
-          <Link href="/login" className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sm font-medium rounded-lg transition border border-slate-700">
-            Connexion Organisateur
-          </Link>
-        )}
+    <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between p-6 md:p-12 relative overflow-hidden">
+      
+      {/* En-tête avec Connexion Organisateur */}
+      <div className="max-w-6xl w-full mx-auto flex justify-between items-center z-10">
+        <div className="flex items-center gap-2">
+          <span className="text-xl font-black tracking-wider bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+            KlicEvent 📸
+          </span>
+        </div>
+        <Link
+          href="/dashboard"
+          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 text-sm font-medium rounded-xl border border-slate-800 transition"
+        >
+          Connexion Organisateur
+        </Link>
       </div>
 
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl space-y-6 text-center">
-        <h1 className="text-3xl font-bold text-purple-400">KlicEvent 📸</h1>
-        <p className="text-slate-400 text-sm">Crée ton espace photo instantané pour ton événement en un clin d'œil.</p>
+      {/* Contenu principal */}
+      <div className="max-w-2xl mx-auto text-center space-y-8 z-10 my-auto py-12">
+        <div className="space-y-4">
+          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
+            Capture, partage, diffuse. Ton espace photo instantané pour tous tes événements en un clin d'œil.
+          </h1>
+          <p className="text-slate-400 text-base md:text-lg max-w-xl mx-auto font-normal">
+            Transforme le smartphone de chaque invité en photomaton instantané. Des souvenirs partagés et affichés en direct sur grand écran, sans application à télécharger.
+          </p>
+        </div>
 
-        <form onSubmit={handleCreateEvent} className="space-y-4 text-left">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Nom de l'événement</label>
-            <input
-              type="text"
-              required
-              placeholder="Ex: Mariage de Julie & Thomas"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500"
-            />
-          </div>
+        {/* Formulaire de création rapide */}
+        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 p-8 rounded-3xl shadow-2xl text-left space-y-4">
+          <form onSubmit={handleCreateEvent} className="space-y-4">
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-purple-400 font-semibold mb-2">
+                Nom de l'événement
+              </label>
+              <input
+                type="text"
+                value={eventTitle}
+                onChange={(e) => setEventTitle(e.target.value)}
+                placeholder="Ex: Mariage de Julie & Thomas"
+                required
+                className="w-full px-4 py-3.5 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 transition"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold rounded-xl transition shadow-lg shadow-purple-900/30 cursor-pointer disabled:opacity-50"
+            >
+              {loading ? 'Création en cours...' : 'Créer mon événement 🚀'}
+            </button>
+          </form>
+        </div>
+      </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800/50 text-white font-medium rounded-lg transition duration-200 shadow-lg cursor-pointer"
-          >
-            {loading ? 'Création en cours...' : 'Créer mon événement 🚀'}
-          </button>
-        </form>
+      {/* Pied de page */}
+      <div className="max-w-6xl w-full mx-auto text-center text-xs text-slate-600 z-10">
+        © {new Date().getFullYear()} KlicEvent. Tous droits réservés.
       </div>
     </main>
   );
