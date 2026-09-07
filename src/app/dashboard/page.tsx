@@ -16,13 +16,11 @@ export default function DashboardPage() {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        // Optionnel : rediriger vers une page de login ou laisser public avec les événements liés au cookie/local
         setUser(null);
       } else {
         setUser(session.user);
       }
 
-      // Récupérer les événements depuis Supabase
       let query = supabase.from('events').select('*').order('created_at', { ascending: false });
       
       if (session) {
@@ -41,6 +39,27 @@ export default function DashboardPage() {
 
     fetchUserDataAndEvents();
   }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/');
+  };
+
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!confirm("Es-tu sûr de vouloir supprimer cet événement ?")) return;
+
+    const { error } = await supabase
+      .from('events')
+      .delete()
+      .eq('id', eventId);
+
+    if (error) {
+      console.error("Erreur lors de la suppression :", error);
+      alert("Impossible de supprimer l'événement.");
+    } else {
+      setEvents(events.filter((evt: any) => evt.id !== eventId));
+    }
+  };
 
   return (
     <main className="min-h-screen bg-slate-950 text-white p-6 md:p-12">
@@ -65,6 +84,12 @@ export default function DashboardPage() {
             >
               + Nouvel événement
             </Link>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-red-950/50 hover:bg-red-900/50 text-red-300 text-sm font-medium rounded-xl border border-red-900/50 transition cursor-pointer"
+            >
+              Déconnexion
+            </button>
           </div>
         </div>
 
@@ -83,10 +108,10 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {events.map((evt) => (
+            {events.map((evt: any) => (
               <div 
                 key={evt.id}
-                className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4 hover:border-slate-700 transition"
+                className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4 hover:border-slate-700 transition relative"
               >
                 <div className="flex justify-between items-start">
                   <div>
@@ -103,14 +128,20 @@ export default function DashboardPage() {
                     href={`/events/${evt.slug}`}
                     className="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition"
                   >
-                    Voir l'espace photo
+                    Voir
                   </Link>
                   <Link
                     href={`/events/${evt.slug}/live`}
                     className="flex-1 text-center py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 text-xs font-semibold rounded-lg border border-purple-800/50 transition"
                   >
-                    Diaporama Live 📺
+                    Live 📺
                   </Link>
+                  <button
+                    onClick={() => handleDeleteEvent(evt.id)}
+                    className="px-3 py-2 bg-red-950/40 hover:bg-red-900/60 text-red-400 text-xs font-semibold rounded-lg border border-red-900/50 transition cursor-pointer"
+                  >
+                    🗑️
+                  </button>
                 </div>
               </div>
             ))}
@@ -121,25 +152,3 @@ export default function DashboardPage() {
     </main>
   );
 }
-
-const handleLogout = async () => {
-  await supabase.auth.signOut();
-  router.push('/');
-};
-
-const handleDeleteEvent = async (eventId: string) => {
-  if (!confirm("Es-tu sûr de vouloir supprimer cet événement ?")) return;
-
-  const { error } = await supabase
-    .from('events')
-    .delete()
-    .eq('id', eventId);
-
-  if (error) {
-    console.error("Erreur lors de la suppression :", error);
-    alert("Impossible de supprimer l'événement.");
-  } else {
-    // Met à jour la liste locale des événements affichés
-    setEvents(events.filter(evt => evt.id !== eventId));
-  }
-};
