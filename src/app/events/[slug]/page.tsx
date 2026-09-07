@@ -45,12 +45,20 @@ export default function EventGalleryPage({ params }: { params: Promise<{ slug: s
             <h1 className="text-3xl font-bold mt-2">Événement #{slug}</h1>
             <p className="text-slate-400 text-sm mt-1">Partagez et téléchargez les photos de la soirée !</p>
           </div>
-          <Link
-            href={`/upload?event=${slug}`}
-            className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-xl transition duration-200 shadow-lg hover:shadow-purple-500/25 text-center"
-          >
-            Déposer des photos 📸
-          </Link>
+          <div className="flex flex-wrap gap-3 items-center">
+            <Link
+              href={`/events/${slug}/slideshow`}
+              className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-purple-300 font-medium rounded-xl transition duration-200 border border-slate-700 flex items-center gap-2"
+            >
+              🖥️ Diaporama Live
+            </Link>
+            <Link
+              href={`/upload?event=${slug}`}
+              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-xl transition duration-200 shadow-lg hover:shadow-purple-500/25 text-center"
+            >
+              Déposer des photos 📸
+            </Link>
+          </div>
         </div>
 
         {/* Grille de photos */}
