@@ -24,7 +24,7 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
       } else {
-        router.push('/dashboard');
+        window.location.href = '/dashboard';
       }
     }
   };
@@ -74,6 +74,7 @@ export default function LoginPage() {
 
         <div className="text-center">
           <button
+            type="button"
             onClick={() => setIsSignUp(!isSignUp)}
             className="text-xs text-slate-400 hover:text-purple-400 underline cursor-pointer"
           >
