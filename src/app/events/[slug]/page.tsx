@@ -13,7 +13,8 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
   const [photos, setPhotos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'slideshow'>('grid');
+  const [currentIndex, setCurrentIndex] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -71,6 +72,16 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
     };
   }, [slug, router]);
 
+  // Effet pour faire tourner le diaporama automatiquement toutes les 4 secondes si activé
+  useEffect(() => {
+    if (viewMode === 'slideshow' && photos.length > 0) {
+      const interval = setInterval(() => {
+        setCurrentIndex((prevIndex) => (prevIndex + 1) % photos.length);
+      }, 4000);
+      return () => clearInterval(interval);
+    }
+  }, [viewMode, photos.length]);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !event) return;
@@ -120,9 +131,26 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
             <span className="text-xs uppercase tracking-wider text-purple-400 font-semibold">Galerie Live KlicEvent</span>
             <h1 className="text-3xl font-bold mt-1">{event.title}</h1>
           </div>
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <label className="flex-1 md:flex-none text-center px-5 py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-xl transition shadow-lg cursor-pointer">
-              {uploading ? 'Envoi en cours...' : '📸 Prendre ou choisir une photo'}
+          
+          <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
+            {/* Boutons de bascule Grille / Diaporama */}
+            <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`px-3 py-2 text-xs font-medium rounded-lg transition ${viewMode === 'grid' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Grille
+              </button>
+              <button
+                onClick={() => setViewMode('slideshow')}
+                className={`px-3 py-2 text-xs font-medium rounded-lg transition ${viewMode === 'slideshow' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                🎬 Diaporama
+              </button>
+            </div>
+
+            <label className="text-center px-5 py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-xl transition shadow-lg cursor-pointer">
+              {uploading ? 'Envoi...' : '📸 Photo'}
               <input
                 type="file"
                 accept="image/*"
@@ -146,13 +174,41 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
             <p className="text-xl text-slate-400 font-medium">Aucune photo pour le moment.</p>
             <p className="text-sm text-slate-500">Sois le premier à immortaliser un moment de cet événement !</p>
           </div>
+        ) : viewMode === 'slideshow' ? (
+          /* Mode Diaporama immersif */
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col items-center space-y-4">
+            <div className="relative w-full h-[60vh] flex items-center justify-center bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
+              <img
+                src={photos[currentIndex]?.url}
+                alt="Diaporama en direct"
+                className="max-h-full max-w-full object-contain transition-all duration-500"
+              />
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setCurrentIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1))}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sm font-medium rounded-xl transition border border-slate-700"
+              >
+                ← Précédent
+              </button>
+              <span className="text-xs text-slate-400">
+                Photo {currentIndex + 1} sur {photos.length}
+              </span>
+              <button
+                onClick={() => setCurrentIndex((prev) => (prev + 1) % photos.length)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sm font-medium rounded-xl transition border border-slate-700"
+              >
+                Suivant →
+              </button>
+            </div>
+          </div>
         ) : (
+          /* Mode Grille classique */
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {photos.map((photo) => (
               <div
                 key={photo.id}
-                onClick={() => setSelectedPhoto(photo.url)}
-                className="relative aspect-square rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 shadow-xl group cursor-pointer"
+                className="relative aspect-square rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 shadow-xl group"
               >
                 <img
                   src={photo.url}
@@ -164,28 +220,6 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
           </div>
         )}
       </div>
-
-      {/* Modal Diaporama / Plein écran */}
-      {selectedPhoto && (
-        <div 
-          onClick={() => setSelectedPhoto(null)}
-          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 cursor-pointer"
-        >
-          <div className="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center">
-            <img
-              src={selectedPhoto}
-              alt="Agrandissement"
-              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
-            />
-            <button
-              onClick={() => setSelectedPhoto(null)}
-              className="absolute top-4 right-4 bg-slate-800/80 hover:bg-slate-700 text-white w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold border border-slate-700 transition"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
