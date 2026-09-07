@@ -13,6 +13,7 @@ export default function CreateEventPage() {
   const [planType, setPlanType] = useState('demo'); // 'demo' ou 'standard'
   const [loading, setLoading] = useState(false);
 
+  // Définition des deux formules
   const planDetails = {
     demo: { max: 20, price: 0 },
     standard: { max: 300, price: 29 },
@@ -23,12 +24,13 @@ export default function CreateEventPage() {
     setLoading(true);
 
     try {
+      // Récupérer l'utilisateur connecté pour lier l'événement à son dashboard
       const { data: { session } } = await supabase.auth.getSession();
       const userId = session ? session.user.id : null;
 
       const currentPlan = planDetails[planType as keyof typeof planDetails];
 
-      // Redirection vers Stripe si formule payante (Standard à 29€)
+      // Redirection obligatoire vers Stripe si la formule est payante (29€)
       if (currentPlan.price > 0) {
         const response = await fetch('/api/checkout', {
           method: 'POST',
@@ -44,14 +46,14 @@ export default function CreateEventPage() {
 
         const data = await response.json();
         if (data.url) {
-          window.location.href = data.url;
+          window.location.href = data.url; // Redirection vers Stripe Checkout
           return;
         } else {
           throw new Error(data.error || "Erreur lors de la création de la session de paiement.");
         }
       }
 
-      // Formule gratuite (démo)
+      // Traitement direct pour la formule gratuite (Démo)
       const slug = title
         .toLowerCase()
         .normalize("NFD")
@@ -79,6 +81,7 @@ export default function CreateEventPage() {
 
       if (error) throw error;
 
+      // Envoi de l'e-mail de confirmation via Resend
       await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -150,7 +153,7 @@ export default function CreateEventPage() {
             />
           </div>
 
-          {/* Sélecteur de formules sous forme de cartes cliquables */}
+          {/* Cartes de sélection des formules */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-3">Choisissez votre formule</label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
