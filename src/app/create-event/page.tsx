@@ -120,10 +120,10 @@ function CreateEventForm() {
     <div className="max-w-lg w-full">
       <div className="mb-6">
         <Link
-          href="/dashboard"
+          href="/"
           className="text-sm text-purple-400 hover:underline flex items-center gap-1"
         >
-          ← Retour au dashboard
+          ← Retour à l'accueil
         </Link>
       </div>
 
