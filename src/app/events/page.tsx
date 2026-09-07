@@ -74,6 +74,7 @@ export default function EventsListPage() {
             Mes Événements 📸
           </h1>
           <div className="flex items-center gap-3">
+            {/* Le bouton pointe bien vers /login pour l'espace organisateur */}
             <Link
               href="/login"
               className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 text-sm font-medium rounded-lg border border-slate-800 transition duration-200"
