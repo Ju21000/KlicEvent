@@ -34,6 +34,10 @@ function SuccessContent() {
       });
   }, [sessionId]);
 
+  // Sécurisation de l'URL de base pour éviter le préfixe undefined
+  const baseUrl = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://klic-event-3qvk.vercel.app';
+  const galleryUrl = eventData?.galleryUrl || `${baseUrl}/events/demo-event`;
+
   if (loading) {
     return (
       <p className="text-purple-400 text-lg animate-pulse">Validation de votre paiement et création de l'événement...</p>
@@ -51,8 +55,6 @@ function SuccessContent() {
       </div>
     );
   }
-
-  const galleryUrl = eventData?.galleryUrl || `${window.location.origin}/events/demo-event`;
 
   return (
     <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl space-y-6 text-center">
