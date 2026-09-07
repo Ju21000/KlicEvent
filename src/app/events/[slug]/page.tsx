@@ -30,6 +30,35 @@ export default function EventGalleryPage({ params }: { params: Promise<{ slug: s
     fetchPhotos();
   }, [slug]);
 
+  // Fonction pour supprimer une photo
+  const handleDeletePhoto = async (photoId: string, photoUrl: string) => {
+    if (!confirm("Veux-tu vraiment supprimer cette photo ?")) return;
+
+    try {
+      // 1. Extraire le chemin du fichier dans le storage à partir de l'URL publique
+      const urlParts = photoUrl.split('/event-photos/');
+      if (urlParts.length > 1) {
+        const filePath = urlParts[1];
+        // Supprimer du storage Supabase
+        await supabase.storage.from('event-photos').remove([filePath]);
+      }
+
+      // 2. Supprimer de la table 'photos'
+      const { error } = await supabase
+        .from('photos')
+        .delete()
+        .eq('id', photoId);
+
+      if (error) throw error;
+
+      // 3. Mettre à jour l'état local pour actualiser l'affichage instantanément
+      setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+    } catch (error) {
+      console.error("Erreur lors de la suppression :", error);
+      alert("Impossible de supprimer la photo.");
+    }
+  };
+
   // Fonction pour télécharger toutes les photos en ZIP
   const handleDownloadAll = async () => {
     if (photos.length === 0) return;
@@ -44,7 +73,6 @@ export default function EventGalleryPage({ params }: { params: Promise<{ slug: s
         const response = await fetch(photo.url);
         const blob = await response.blob();
         
-        // Extrait l'extension du fichier ou met .jpg par défaut
         const extension = photo.url.split('.').pop()?.split('?')[0] || 'jpg';
         folder?.file(`photo-${i + 1}.${extension}`, blob);
       }
@@ -125,13 +153,21 @@ export default function EventGalleryPage({ params }: { params: Promise<{ slug: s
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {photos.map((photo) => (
-              <div key={photo.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg group">
+              <div key={photo.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg group relative">
                 <div className="aspect-square relative overflow-hidden bg-slate-950">
                   <img
                     src={photo.url}
                     alt="Photo événement"
                     className="object-cover w-full h-full group-hover:scale-105 transition duration-300"
                   />
+                  {/* Bouton de modération / suppression */}
+                  <button
+                    onClick={() => handleDeletePhoto(photo.id, photo.url)}
+                    className="absolute top-3 right-3 bg-red-600/80 hover:bg-red-600 text-white p-2 rounded-lg opacity-0 group-hover:opacity-100 transition duration-200 shadow-lg backdrop-blur-sm cursor-pointer"
+                    title="Supprimer cette photo"
+                  >
+                    🗑️
+                  </button>
                 </div>
               </div>
             ))}
