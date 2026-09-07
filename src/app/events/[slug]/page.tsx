@@ -1,11 +1,37 @@
 'use client';
 
-import { use } from 'react';
+import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 
 export default function EventGalleryPage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = use(params);
   const slug = resolvedParams.slug;
+
+  const [photos, setPhotos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchPhotos() {
+      console.log("Recherche des photos pour le slug :", slug);
+
+      const { data, error } = await supabase
+        .from('photos')
+        .select('*')
+        .eq('event_slug', slug)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("Erreur lors de la récupération des photos:", error);
+      } else {
+        console.log("Photos récupérées avec succès :", data);
+        if (data) setPhotos(data);
+      }
+      setLoading(false);
+    }
+
+    fetchPhotos();
+  }, [slug]);
 
   return (
     <main className="min-h-screen bg-slate-950 text-white p-6 flex flex-col items-center">
@@ -27,22 +53,40 @@ export default function EventGalleryPage({ params }: { params: Promise<{ slug: s
           </Link>
         </div>
 
-        {/* Grille de photos (Vide pour l'instant) */}
-        <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-12 text-center space-y-4">
-          <div className="w-16 h-16 bg-slate-800 text-slate-500 rounded-full flex items-center justify-center mx-auto text-2xl">
-            🖼️
+        {/* Grille de photos */}
+        {loading ? (
+          <p className="text-center text-purple-400 animate-pulse">Chargement des souvenirs...</p>
+        ) : photos.length === 0 ? (
+          <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-12 text-center space-y-4">
+            <div className="w-16 h-16 bg-slate-800 text-slate-500 rounded-full flex items-center justify-center mx-auto text-2xl">
+              🖼️
+            </div>
+            <h2 className="text-xl font-semibold text-slate-300">Aucune photo pour le moment</h2>
+            <p className="text-slate-500 text-sm max-w-md mx-auto">
+              Sois le premier à immortaliser ce moment en téléversant tes clichés depuis ton téléphone !
+            </p>
+            <Link
+              href={`/upload?event=${slug}`}
+              className="inline-block mt-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition duration-200"
+            >
+              Ajouter des photos
+            </Link>
           </div>
-          <h2 className="text-xl font-semibold text-slate-300">Aucune photo pour le moment</h2>
-          <p className="text-slate-500 text-sm max-w-md mx-auto">
-            Sois le premier à immortaliser ce moment en téléversant tes clichés depuis ton téléphone !
-          </p>
-          <Link
-            href={`/upload?event=${slug}`}
-            className="inline-block mt-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition duration-200"
-          >
-            Ajouter des photos
-          </Link>
-        </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {photos.map((photo) => (
+              <div key={photo.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg group">
+                <div className="aspect-square relative overflow-hidden bg-slate-950">
+                  <img
+                    src={photo.url}
+                    alt="Photo événement"
+                    className="object-cover w-full h-full group-hover:scale-105 transition duration-300"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </main>
   );
