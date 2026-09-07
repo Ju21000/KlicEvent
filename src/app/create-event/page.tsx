@@ -1,17 +1,26 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
-export default function CreateEventPage() {
+function CreateEventForm() {
   const router = useRouter();
-  const [title, setTitle] = useState('');
+  const searchParams = useSearchParams();
+  const initialTitle = searchParams.get('title') || '';
+
+  const [title, setTitle] = useState(initialTitle);
   const [date, setDate] = useState('');
   const [email, setEmail] = useState('');
   const [planType, setPlanType] = useState('demo'); // 'demo' ou 'standard'
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (initialTitle && !title) {
+      setTitle(initialTitle);
+    }
+  }, [initialTitle]);
 
   // Définition des deux formules
   const planDetails = {
@@ -25,18 +34,23 @@ export default function CreateEventPage() {
 
     try {
       // Récupérer l'utilisateur connecté pour lier l'événement à son dashboard
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const userId = session ? session.user.id : null;
 
       const currentPlan = planDetails[planType as keyof typeof planDetails];
 
       // Génération du slug unique
-      const slug = title
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)+/g, '') + '-' + Date.now().toString().slice(-4);
+      const slug =
+        title
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)+/g, '') +
+        '-' +
+        Date.now().toString().slice(-4);
 
       // 1. On crée d'abord l'événement dans Supabase (en pending si payant, paid si démo)
       const { data: eventData, error: eventError } = await supabase
@@ -52,14 +66,14 @@ export default function CreateEventPage() {
             price: currentPlan.price,
             payment_status: currentPlan.price > 0 ? 'pending' : 'paid',
             user_id: userId,
-          }
+          },
         ])
         .select()
         .single();
 
       if (eventError) throw eventError;
 
-      // 2. Si la formule est payante, on appelle l'API de checkout avec l'eventId tout fraîchement créé
+      // 2. Si la formule est payante, on appelle l'API de checkout avec l'eventId créé
       if (currentPlan.price > 0) {
         const response = await fetch('/api/checkout', {
           method: 'POST',
@@ -77,7 +91,7 @@ export default function CreateEventPage() {
           window.location.href = data.url; // Redirection vers Stripe Checkout
           return;
         } else {
-          throw new Error(data.error || "Erreur lors de la création de la session de paiement.");
+          throw new Error(data.error || 'Erreur lors de la création de la session de paiement.');
         }
       }
 
@@ -94,9 +108,8 @@ export default function CreateEventPage() {
       });
 
       router.push(`/events/${eventData.slug}`);
-
     } catch (err) {
-      console.error("Erreur lors de la création :", err);
+      console.error('Erreur lors de la création :', err);
       alert("Une erreur est survenue lors de la création de l'événement.");
     } finally {
       setLoading(false);
@@ -104,88 +117,119 @@ export default function CreateEventPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white p-8 flex items-center justify-center">
-      <div className="max-w-lg w-full">
-        <div className="mb-6">
-          <Link
-            href="/dashboard"
-            className="text-sm text-purple-400 hover:underline flex items-center gap-1"
-          >
-            ← Retour au dashboard
-          </Link>
+    <div className="max-w-lg w-full">
+      <div className="mb-6">
+        <Link
+          href="/dashboard"
+          className="text-sm text-purple-400 hover:underline flex items-center gap-1"
+        >
+          ← Retour au dashboard
+        </Link>
+      </div>
+
+      <form
+        onSubmit={handleSubmit}
+        className="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-xl space-y-6"
+      >
+        <h1 className="text-2xl font-bold text-white">Créer un nouvel événement</h1>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-2">
+            Titre de l'événement
+          </label>
+          <input
+            type="text"
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Ex: Mariage de Marie & Thomas"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500"
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-xl space-y-6">
-          <h1 className="text-2xl font-bold text-white">Créer un nouvel événement</h1>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-2">
+            Date de l'événement
+          </label>
+          <input
+            type="date"
+            required
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500"
+          />
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Titre de l'événement</label>
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex: Mariage de Marie & Thomas"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500"
-            />
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-2">
+            Votre adresse e-mail (Organisateur)
+          </label>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="votre.email@exemple.com"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500"
+          />
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Date de l'événement</label>
-            <input
-              type="date"
-              required
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500"
-            />
-          </div>
+        {/* Cartes de sélection des formules */}
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-3">
+            Choisissez votre formule
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div
+              onClick={() => setPlanType('demo')}
+              className={`cursor-pointer border rounded-xl p-4 transition ${
+                planType === 'demo'
+                  ? 'border-purple-500 bg-purple-950/30 shadow-lg'
+                  : 'border-slate-800 bg-slate-950 hover:border-slate-700'
+              }`}
+            >
+              <div className="font-bold text-white">Démo</div>
+              <div className="text-xs text-slate-400 mt-1">20 photos max</div>
+              <div className="text-purple-400 font-semibold mt-3">Gratuit</div>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Votre adresse e-mail (Organisateur)</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="votre.email@exemple.com"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500"
-            />
-          </div>
-
-          {/* Cartes de sélection des formules */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-3">Choisissez votre formule</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div 
-                onClick={() => setPlanType('demo')}
-                className={`cursor-pointer border rounded-xl p-4 transition ${planType === 'demo' ? 'border-purple-500 bg-purple-950/30 shadow-lg' : 'border-slate-800 bg-slate-950 hover:border-slate-700'}`}
-              >
-                <div className="font-bold text-white">Démo</div>
-                <div className="text-xs text-slate-400 mt-1">20 photos max</div>
-                <div className="text-purple-400 font-semibold mt-3">Gratuit</div>
-              </div>
-
-              <div 
-                onClick={() => setPlanType('standard')}
-                className={`cursor-pointer border rounded-xl p-4 transition ${planType === 'standard' ? 'border-purple-500 bg-purple-950/30 shadow-lg' : 'border-slate-800 bg-slate-950 hover:border-slate-700'}`}
-              >
-                <div className="font-bold text-white">Standard</div>
-                <div className="text-xs text-slate-400 mt-1">300 photos</div>
-                <div className="text-purple-400 font-semibold mt-3">29 €</div>
-              </div>
+            <div
+              onClick={() => setPlanType('standard')}
+              className={`cursor-pointer border rounded-xl p-4 transition ${
+                planType === 'standard'
+                  ? 'border-purple-500 bg-purple-950/30 shadow-lg'
+                  : 'border-slate-800 bg-slate-950 hover:border-slate-700'
+              }`}
+            >
+              <div className="font-bold text-white">Standard</div>
+              <div className="text-xs text-slate-400 mt-1">300 photos</div>
+              <div className="text-purple-400 font-semibold mt-3">29 €</div>
             </div>
           </div>
+        </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl shadow-lg transition cursor-pointer disabled:opacity-50"
-          >
-            {loading ? "Patientez..." : planType === 'standard' ? "Payer 29€ & Créer l'événement" : "Créer l'événement gratuit"}
-          </button>
-        </form>
-      </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl shadow-lg transition cursor-pointer disabled:opacity-50"
+        >
+          {loading
+            ? 'Patientez...'
+            : planType === 'standard'
+            ? "Payer 29€ & Créer l'événement"
+            : "Créer l'événement gratuit"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+export default function CreateEventPage() {
+  return (
+    <main className="min-h-screen bg-slate-950 text-white p-8 flex items-center justify-center">
+      <Suspense fallback={<p className="text-slate-400">Chargement...</p>}>
+        <CreateEventForm />
+      </Suspense>
     </main>
   );
 }

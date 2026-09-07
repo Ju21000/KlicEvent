@@ -52,7 +52,9 @@ export default function Home() {
       return;
     }
 
-    router.push(`/create-event?eventId=${data.id}`);
+    router.push(
+      `/create-event?eventId=${data.id}&title=${encodeURIComponent(eventTitle.trim())}`
+    );
   };
 
   return (
