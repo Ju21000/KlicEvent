@@ -44,7 +44,7 @@ export default function DashboardPage() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.push('/');
+    window.location.href = '/'; // Redirection nette avec rechargement complet
   };
 
   const handleDeleteEvent = async (eventId: string) => {
