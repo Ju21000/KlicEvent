@@ -121,11 +121,11 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
           </div>
           <div className="flex items-center gap-3 w-full md:w-auto">
             <label className="flex-1 md:flex-none text-center px-5 py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-xl transition shadow-lg cursor-pointer">
-              {uploading ? 'Envoi en cours...' : '📸 Ajouter des photos'}
+              {uploading ? 'Envoi en cours...' : '📸 Prendre ou choisir une photo'}
               <input
                 type="file"
-                multiple
                 accept="image/*"
+                capture="environment"
                 onChange={handleFileUpload}
                 disabled={uploading}
                 className="hidden"
