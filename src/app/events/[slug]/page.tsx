@@ -20,7 +20,7 @@ export default function EventGalleryPage({ params }: { params: Promise<{ slug: s
             <p className="text-slate-400 text-sm mt-1">Partagez et téléchargez les photos de la soirée !</p>
           </div>
           <Link
-            href="/upload"
+            href={`/upload?event=${slug}`}
             className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-xl transition duration-200 shadow-lg hover:shadow-purple-500/25 text-center"
           >
             Déposer des photos 📸
@@ -37,7 +37,7 @@ export default function EventGalleryPage({ params }: { params: Promise<{ slug: s
             Sois le premier à immortaliser ce moment en téléversant tes clichés depuis ton téléphone !
           </p>
           <Link
-            href="/upload"
+            href={`/upload?event=${slug}`}
             className="inline-block mt-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition duration-200"
           >
             Ajouter des photos
