@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 
 function UploadContent() {
   const searchParams = useSearchParams();
@@ -10,17 +11,58 @@ function UploadContent() {
 
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleUpload = (e: React.FormEvent) => {
+  const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!eventParam) return;
-    
+
     setUploading(true);
-    // Simulation d'envoi de photos
-    setTimeout(() => {
+    setError('');
+
+    const form = e.currentTarget;
+    const fileInput = form.elements.namedItem('photos') as HTMLInputElement;
+    const files = fileInput?.files;
+
+    if (!files || files.length === 0) {
       setUploading(false);
+      return;
+    }
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${eventParam}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+
+        // 1. Upload du fichier dans le stockage Supabase (Bucket 'event-photos')
+        const { error: storageError } = await supabase.storage
+          .from('event-photos')
+          .upload(fileName, file);
+
+        if (storageError) throw storageError;
+
+        // 2. Récupération de l'URL publique de l'image
+        const { data: publicUrlData } = supabase.storage
+          .from('event-photos')
+          .getPublicUrl(fileName);
+
+        const photoUrl = publicUrlData.publicUrl;
+
+        // 3. Enregistrement de l'URL dans la table de la base de données ('photos')
+        const { error: dbError } = await supabase
+          .from('photos')
+          .insert([{ event_slug: eventParam, url: photoUrl }]);
+
+        if (dbError) throw dbError;
+      }
+
       setSuccess(true);
-    }, 1500);
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors du téléversement des photos.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -34,12 +76,18 @@ function UploadContent() {
         )}
       </div>
 
+      {error && (
+        <div className="bg-red-500/10 border border-red-500 text-red-400 p-3 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
       {success ? (
         <div className="bg-green-500/10 border border-green-500 text-green-400 p-4 rounded-xl text-center space-y-3">
           <p className="font-semibold">Photos envoyées avec succès ! 🎉</p>
           <button
             onClick={() => setSuccess(false)}
-            className="px-4 py-2 bg-slate-800 text-white text-sm rounded-lg hover:bg-slate-700"
+            className="px-4 py-2 bg-slate-800 text-white text-sm rounded-lg hover:bg-slate-700 cursor-pointer"
           >
             Ajouter d'autres photos
           </button>
@@ -61,6 +109,7 @@ function UploadContent() {
               Sélectionner vos photos (plusieurs possibles)
             </label>
             <input
+              name="photos"
               type="file"
               multiple
               accept="image/*"
