@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import JSZip from 'jszip';
 
 export default function EventGalleryPage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = use(params);
@@ -10,28 +11,60 @@ export default function EventGalleryPage({ params }: { params: Promise<{ slug: s
 
   const [photos, setPhotos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingZip, setDownloadingZip] = useState(false);
 
   useEffect(() => {
     async function fetchPhotos() {
-      console.log("Recherche des photos pour le slug :", slug);
-
       const { data, error } = await supabase
         .from('photos')
         .select('*')
         .eq('event_slug', slug)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error("Erreur lors de la récupération des photos:", error);
-      } else {
-        console.log("Photos récupérées avec succès :", data);
-        if (data) setPhotos(data);
+      if (!error && data) {
+        setPhotos(data);
       }
       setLoading(false);
     }
 
     fetchPhotos();
   }, [slug]);
+
+  // Fonction pour télécharger toutes les photos en ZIP
+  const handleDownloadAll = async () => {
+    if (photos.length === 0) return;
+
+    setDownloadingZip(true);
+    const zip = new JSZip();
+    const folder = zip.folder(`klic-event-${slug}`);
+
+    try {
+      for (let i = 0; i < photos.length; i++) {
+        const photo = photos[i];
+        const response = await fetch(photo.url);
+        const blob = await response.blob();
+        
+        // Extrait l'extension du fichier ou met .jpg par défaut
+        const extension = photo.url.split('.').pop()?.split('?')[0] || 'jpg';
+        folder?.file(`photo-${i + 1}.${extension}`, blob);
+      }
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = window.URL.createObjectURL(content);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `evenement-${slug}-photos.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Erreur lors de la création du ZIP :", error);
+      alert("Une erreur est survenue lors du téléchargement groupé.");
+    } finally {
+      setDownloadingZip(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-slate-950 text-white p-6 flex flex-col items-center">
@@ -46,6 +79,15 @@ export default function EventGalleryPage({ params }: { params: Promise<{ slug: s
             <p className="text-slate-400 text-sm mt-1">Partagez et téléchargez les photos de la soirée !</p>
           </div>
           <div className="flex flex-wrap gap-3 items-center">
+            {photos.length > 0 && (
+              <button
+                onClick={handleDownloadAll}
+                disabled={downloadingZip}
+                className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-800/50 text-white font-medium rounded-xl transition duration-200 shadow-lg flex items-center gap-2 cursor-pointer"
+              >
+                {downloadingZip ? 'Génération du ZIP...' : '📥 Tout télécharger'}
+              </button>
+            )}
             <Link
               href={`/events/${slug}/slideshow`}
               className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-purple-300 font-medium rounded-xl transition duration-200 border border-slate-700 flex items-center gap-2"
