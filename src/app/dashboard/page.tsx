@@ -1,156 +1,145 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, use } from 'react';
 import { supabase } from '@/lib/supabase';
-import Link from 'next/link';
 
-export default function DashboardPage() {
-  const router = useRouter();
-  const [events, setEvents] = useState<any[]>([]);
+export default function LiveSlideshowPage({ params }: { params: Promise<{ slug: string }> }) {
+  const resolvedParams = use(params);
+  const slug = resolvedParams.slug;
+
+  const [event, setEvent] = useState<any>(null);
+  const [photos, setPhotos] = useState<any[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const fetchUserDataAndEvents = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        setUser(null);
-        setEvents([]);
+    const fetchEventAndPhotos = async () => {
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .select('*')
+        .eq('slug', slug)
+        .single();
+
+      if (eventError || !eventData) {
         setLoading(false);
         return;
       }
 
-      setUser(session.user);
+      setEvent(eventData);
 
-      // Requête strictement filtrée par l'ID de l'utilisateur connecté
-      const { data, error } = await supabase
-        .from('events')
+      const { data: photosData, error: photosError } = await supabase
+        .from('photos')
         .select('*')
-        .eq('user_id', session.user.id)
+        .eq('event_id', eventData.id)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error("Erreur lors de la récupération des événements :", error);
-      } else {
-        setEvents(data || []);
+      if (!photosError && photosData) {
+        setPhotos(photosData);
       }
+
       setLoading(false);
     };
 
-    fetchUserDataAndEvents();
-  }, []);
+    fetchEventAndPhotos();
+  }, [slug]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.href = '/'; // Redirection nette avec rechargement complet
-  };
+  useEffect(() => {
+    if (!event) return;
 
-  const handleDeleteEvent = async (eventId: string) => {
-    if (!confirm("Es-tu sûr de vouloir supprimer cet événement ?")) return;
+    const channel = supabase
+      .channel(`public:photos:event_id=eq.${event.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'photos',
+          filter: `event_id=eq.${event.id}`,
+        },
+        (payload) => {
+          setPhotos((prev) => [payload.new, ...prev]);
+        }
+      )
+      .subscribe();
 
-    const { error } = await supabase
-      .from('events')
-      .delete()
-      .eq('id', eventId);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [event]);
 
-    if (error) {
-      console.error("Erreur lors de la suppression :", error);
-      alert("Impossible de supprimer l'événement.");
-    } else {
-      setEvents(events.filter((evt: any) => evt.id !== eventId));
-    }
-  };
+  useEffect(() => {
+    if (photos.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % photos.length);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [photos.length]);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+        <p className="text-xl animate-pulse">Chargement du diaporama...</p>
+      </main>
+    );
+  }
+
+  if (!event) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+        <p className="text-xl text-red-400">Événement introuvable.</p>
+      </main>
+    );
+  }
+
+  const eventUrl = `https://www.KlicEvent.com/events/${slug}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(eventUrl)}`;
+  const currentPhoto = photos.length > 0 ? photos[currentIndex] : null;
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white p-6 md:p-12">
-      <div className="max-w-4xl mx-auto space-y-8">
-        
-        {/* En-tête du Dashboard */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-6">
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight">Tableau de bord</h1>
-            <p className="text-slate-400 text-sm mt-1">Gère tes événements et accède aux diaporamas live.</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 text-sm font-medium rounded-xl border border-slate-800 transition"
-            >
-              Accueil
-            </Link>
-            <Link
-              href="/create-event"
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold rounded-xl shadow-lg transition"
-            >
-              + Nouvel événement
-            </Link>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-red-950/50 hover:bg-red-900/50 text-red-300 text-sm font-medium rounded-xl border border-red-900/50 transition cursor-pointer"
-            >
-              Déconnexion
-            </button>
-          </div>
-        </div>
+    <main className="relative min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center overflow-hidden p-6">
+      
+      {/* En-tête avec titre et rappel de la plateforme */}
+      <div className="absolute top-6 left-6 z-10 flex items-center gap-4">
+        <h1 className="text-2xl font-bold tracking-tight bg-slate-900/80 px-4 py-2 rounded-xl border border-slate-800 backdrop-blur">
+          {event.title}
+        </h1>
+        <span className="text-sm font-semibold text-purple-400 bg-slate-900/80 px-4 py-2 rounded-xl border border-slate-800 backdrop-blur">
+          www.KlicEvent.com
+        </span>
+      </div>
 
-        {/* Liste des événements */}
-        {loading ? (
-          <div className="text-center py-12 text-slate-500">Chargement de vos événements...</div>
-        ) : events.length === 0 ? (
-          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-12 text-center space-y-4">
-            <p className="text-slate-400">Aucun événement trouvé pour le moment.</p>
-            <Link
-              href="/create-event"
-              className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition"
-            >
-              Créer mon premier événement 🚀
-            </Link>
+      {/* Affichage des photos du diaporama */}
+      <div className="flex-1 w-full flex items-center justify-center my-auto">
+        {currentPhoto ? (
+          <div className="relative max-w-5xl max-h-[75vh] w-full h-[75vh] flex items-center justify-center">
+            <img
+              src={currentPhoto.url}
+              alt="Photo live"
+              className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl border border-slate-800/80 animate-fade-in"
+            />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {events.map((evt: any) => (
-              <div 
-                key={evt.id}
-                className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4 hover:border-slate-700 transition relative"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h2 className="text-lg font-bold text-white">{evt.title}</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">Date : {evt.date || 'Non définie'}</p>
-                  </div>
-                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${evt.payment_status === 'paid' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-amber-950 text-amber-400 border border-amber-800'}`}>
-                    {evt.payment_status === 'paid' ? 'Actif / Payé' : 'Démo / En attente'}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80">
-                  <Link
-                    href={`/events/${evt.slug}`}
-                    className="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition"
-                  >
-                    Voir
-                  </Link>
-                  <Link
-                    href={`/events/${evt.slug}/live`}
-                    className="flex-1 text-center py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 text-xs font-semibold rounded-lg border border-purple-800/50 transition"
-                  >
-                    Live 📺
-                  </Link>
-                  <button
-                    onClick={() => handleDeleteEvent(evt.id)}
-                    className="px-3 py-2 bg-red-950/40 hover:bg-red-900/60 text-red-400 text-xs font-semibold rounded-lg border border-red-900/50 transition cursor-pointer"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div className="text-center space-y-4 p-12 bg-slate-900/50 border border-slate-800 rounded-3xl max-w-lg">
+            <p className="text-2xl font-semibold text-slate-300">En attente des premières photos...</p>
+            <p className="text-sm text-slate-400">Scannez le QR code pour balancer vos photos en direct ! 📸</p>
           </div>
         )}
-
       </div>
+
+      {/* QR Code en bas à droite pour flasher et ajouter des photos */}
+      <div className="absolute bottom-6 right-6 z-20 bg-slate-900/90 border border-slate-800 p-4 rounded-2xl backdrop-blur flex items-center gap-4 shadow-2xl">
+        <div className="bg-white p-2 rounded-xl">
+          <img src={qrCodeUrl} alt="QR Code pour ajouter des photos" className="w-24 h-24 object-contain" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-bold text-white">Scannez pour ajouter</p>
+          <p className="text-xs text-purple-400 font-medium">vos photos en direct !</p>
+          <p className="text-xs font-bold text-slate-300 pt-1">www.KlicEvent.com</p>
+        </div>
+      </div>
+
     </main>
   );
 }
