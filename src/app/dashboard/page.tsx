@@ -22,10 +22,10 @@ export default function DashboardPage() {
 
       setUser(session.user);
 
-      const { data: eventsData, error } = await supabase
+      const { data: eventsData } = await supabase
         .from('events')
         .select('*')
-        .or(`user_id.eq.${session.user.id},client_email.eq.${session.user.email}`)
+        .eq('user_id', session.user.id) // Filtrage strict par l'ID utilisateur connecté
         .order('created_at', { ascending: false });
 
       if (eventsData) {
@@ -43,14 +43,13 @@ export default function DashboardPage() {
     router.push('/');
   };
 
-  // Fonction pour supprimer un événement depuis le dashboard
   const handleDeleteEvent = async (eventId: string, eventTitle: string) => {
-    if (!confirm(`Voulez-vous vraiment supprimer l'événement "${eventTitle}" et toutes ses photos ?`)) {
+    if (!confirm(`Voulez-vous vraiment supprimer définitivement l'événement "${eventTitle}" et toutes ses photos ?`)) {
       return;
     }
 
     try {
-      // 1. Récupérer toutes les photos associées à l'événement pour les supprimer du stockage
+      // 1. Supprimer les photos du stockage Supabase
       const { data: photosData } = await supabase
         .from('photos')
         .select('url')
@@ -65,15 +64,18 @@ export default function DashboardPage() {
         }
       }
 
-      // 2. Supprimer les enregistrements de la table photos
+      // 2. Supprimer les lignes de la table photos
       await supabase.from('photos').delete().eq('event_id', eventId);
 
-      // 3. Supprimer l'événement de la table events
-      const { error } = await supabase.from('events').delete().eq('id', eventId);
+      // 3. Supprimer l'événement de la table events de façon stricte par son ID
+      const { error } = await supabase
+        .from('events')
+        .delete()
+        .eq('id', eventId);
 
       if (error) throw error;
 
-      // 4. Mettre à jour l'état local
+      // 4. Mettre à jour l'état local immédiatement
       setEvents((prev) => prev.filter((evt) => evt.id !== eventId));
     } catch (err) {
       console.error("Erreur lors de la suppression de l'événement :", err);
@@ -93,7 +95,6 @@ export default function DashboardPage() {
     <main className="min-h-screen bg-slate-950 text-white p-6 md:p-12">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* En-tête du Dashboard */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl gap-4">
           <div>
             <span className="text-xs uppercase tracking-wider text-purple-400 font-semibold">Mon Compte Organisateur</span>
@@ -117,7 +118,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Liste des événements */}
         <div className="space-y-4">
           <h2 className="text-xl font-bold text-white">Mes Événements ({events.length})</h2>
 
