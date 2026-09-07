@@ -1,72 +1,61 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { createClient } from '@supabase/supabase-js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+  apiVersion: '2025-02-24.acacia' as any,
+});
 
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const sessionId = url.searchParams.get('session_id');
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://klic-event-3qvk.vercel.app';
-
-  if (!sessionId) {
-    return NextResponse.redirect(`${origin}/create-event`);
-  }
-
+export async function POST(req: Request) {
   try {
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
-    const metadata = session.metadata;
+    const { eventId, planType, email, eventTitle } = await req.json();
 
-    if (!metadata) {
-      throw new Error("Métadonnées de session introuvables.");
+    if (!eventId || !planType) {
+      return NextResponse.json({ error: 'Paramètres manquants' }, { status: 400 });
     }
 
-    const { title, date, email, formula, maxPhotos, price, userId } = metadata;
+    // Définition des prix selon la formule
+    let unitAmount = 2900; // Standard par défaut (29 €)
+    let planName = 'Formule Standard - KlicEvent';
 
-    const slug = title
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)+/g, '') + '-' + Date.now().toString().slice(-4);
+    if (planType === 'pro') {
+      unitAmount = 4900; // 49 €
+      planName = 'Formule Pro - KlicEvent';
+    }
 
-    const { data, error } = await supabase
-      .from('events')
-      .insert([
+    // Récupération dynamique de l'origine (klicevent.com en production)
+    const protocol = req.headers.get('x-forwarded-proto') || 'https';
+    const host = req.headers.get('host') || 'klicevent.com';
+    const origin = `${protocol}://${host}`;
+
+    // Création de la session de paiement Stripe
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      customer_email: email || undefined,
+      line_items: [
         {
-          title,
-          date,
-          slug,
-          client_email: email,
-          max_photos: parseInt(maxPhotos, 10),
-          plan_type: formula,
-          price: parseFloat(price),
-          payment_status: 'paid',
-          user_id: userId && userId !== 'null' ? userId : null,
-        }
-      ])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    await fetch(`${origin}/api/send-email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        title: data.title,
-        slug: data.slug,
-        isPaid: true,
-      }),
+          price_data: {
+            currency: 'eur',
+            product_data: {
+              name: planName,
+              description: `Événement : ${eventTitle || 'Mon Événement'}`,
+            },
+            unit_amount: unitAmount,
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}&eventId=${eventId}`,
+      cancel_url: `${origin}/create-event?eventId=${eventId}`,
+      metadata: {
+        eventId: eventId,
+        planType: planType,
+      },
     });
 
-    return NextResponse.redirect(`${origin}/events/${data.slug}`);
-  } catch (err: any) {
-    console.error("Erreur validation paiement Stripe :", err);
-    return NextResponse.redirect(`${origin}/create-event?error=payment_failed`);
+    return NextResponse.json({ url: session.url });
+  } catch (error: any) {
+    console.error('Erreur Stripe Checkout:', error);
+    return NextResponse.json({ error: error.message || 'Erreur interne du serveur' }, { status: 500 });
   }
 }
