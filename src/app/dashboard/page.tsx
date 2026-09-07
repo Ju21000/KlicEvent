@@ -149,7 +149,7 @@ export default function DashboardPage() {
 
                   <div className="flex gap-2 pt-2 border-t border-slate-800">
                     <Link
-                      href={`/events/${evt.slug}`}
+                      href={`/events/${evt.slug}/admin`}
                       className="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg transition"
                     >
                       Voir
