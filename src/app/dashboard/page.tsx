@@ -121,3 +121,25 @@ export default function DashboardPage() {
     </main>
   );
 }
+
+const handleLogout = async () => {
+  await supabase.auth.signOut();
+  router.push('/');
+};
+
+const handleDeleteEvent = async (eventId: string) => {
+  if (!confirm("Es-tu sûr de vouloir supprimer cet événement ?")) return;
+
+  const { error } = await supabase
+    .from('events')
+    .delete()
+    .eq('id', eventId);
+
+  if (error) {
+    console.error("Erreur lors de la suppression :", error);
+    alert("Impossible de supprimer l'événement.");
+  } else {
+    // Met à jour la liste locale des événements affichés
+    setEvents(events.filter(evt => evt.id !== eventId));
+  }
+};
