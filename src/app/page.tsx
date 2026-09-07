@@ -16,15 +16,20 @@ export default function Home() {
 
     setLoading(true);
 
-    const slug = eventTitle
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '') + '-' + Math.random().toString(36).substring(2, 6);
+    const slug =
+      eventTitle
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') +
+      '-' +
+      Math.random().toString(36).substring(2, 6);
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
     const { data, error } = await supabase
       .from('events')
@@ -41,7 +46,7 @@ export default function Home() {
       .single();
 
     if (error) {
-      console.error("Erreur lors de la création :", error);
+      console.error('Erreur lors de la création :', error);
       alert("Impossible de créer l'événement.");
       setLoading(false);
       return;
@@ -52,7 +57,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between p-6 md:p-12 relative overflow-hidden">
-      
       {/* En-tête avec Connexion Organisateur */}
       <div className="max-w-6xl w-full mx-auto flex justify-between items-center z-10">
         <div className="flex items-center gap-2">
@@ -61,7 +65,7 @@ export default function Home() {
           </span>
         </div>
         <Link
-          href="/dashboard"
+          href="/login"
           className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 text-sm font-medium rounded-xl border border-slate-800 transition"
         >
           Connexion Organisateur
