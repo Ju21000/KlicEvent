@@ -84,7 +84,7 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
     };
   }, [slug, router]);
 
-  // Diaporama automatique
+  // Diaporama automatique plein écran toutes les 4 secondes
   useEffect(() => {
     if (isSlideshowOpen && photos.length > 0) {
       const interval = setInterval(() => {
@@ -94,52 +94,68 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
     }
   }, [isSlideshowOpen, photos.length]);
 
+  // Upload sécurisé avec vérification de l'existence de l'événement en base
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !event) return;
 
     setUploading(true);
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `${event.id}/${fileName}`;
+    try {
+      const { data: checkEvent, error: checkError } = await supabase
+        .from('events')
+        .select('id')
+        .eq('id', event.id)
+        .single();
 
-      const { error: uploadError } = await supabase.storage
-        .from('event-photos')
-        .upload(filePath, file);
-
-      if (!uploadError) {
-        const { data: publicUrlData } = supabase.storage
-          .from('event-photos')
-          .getPublicUrl(filePath);
-
-        await supabase.from('photos').insert([
-          {
-            event_id: event.id,
-            url: publicUrlData.publicUrl,
-          },
-        ]);
+      if (checkError || !checkEvent) {
+        alert("Cet événement n'existe plus ou a été supprimé.");
+        router.push('/dashboard');
+        return;
       }
-    }
 
-    setUploading(false);
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `${event.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('event-photos')
+          .upload(filePath, file);
+
+        if (!uploadError) {
+          const { data: publicUrlData } = supabase.storage
+            .from('event-photos')
+            .getPublicUrl(filePath);
+
+          await supabase.from('photos').insert([
+            {
+              event_id: event.id,
+              url: publicUrlData.publicUrl,
+            },
+          ]);
+        }
+      }
+    } catch (err) {
+      console.error("Erreur lors de l'upload :", err);
+      alert("Erreur lors de l'envoi de la photo.");
+    } finally {
+      setUploading(false);
+    }
   };
 
-  // Fonction pour supprimer une photo
+  // Suppression d'une photo
   const handleDeletePhoto = async (photoId: string, photoUrl: string) => {
     if (!confirm("Voulez-vous vraiment supprimer cette photo ?")) return;
 
     try {
-      // 1. Extraire le chemin du fichier dans le storage à partir de l'URL publique
       const urlParts = photoUrl.split('/event-photos/');
       if (urlParts.length > 1) {
         const filePath = urlParts[1];
         await supabase.storage.from('event-photos').remove([filePath]);
       }
 
-      // 2. Supprimer l'entrée de la table photos
       const { error } = await supabase
         .from('photos')
         .delete()
@@ -147,7 +163,6 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
 
       if (error) throw error;
 
-      // 3. Mettre à jour l'état local immédiatement
       setPhotos((prev) => {
         const updated = prev.filter((p) => p.id !== photoId);
         if (updated.length === 0) {
@@ -212,7 +227,7 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
           </div>
         </div>
 
-        {/* Grille principale avec bouton de suppression sur chaque photo */}
+        {/* Grille principale des photos */}
         {photos.length === 0 ? (
           <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-16 text-center space-y-3">
             <p className="text-xl text-slate-400 font-medium">Aucune photo pour le moment.</p>
@@ -246,7 +261,7 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
         )}
       </div>
 
-      {/* Modal Plein Écran Diaporama avec bouton de suppression */}
+      {/* Modal Plein Écran Diaporama */}
       {isSlideshowOpen && photos.length > 0 && (
         <div className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-between p-6">
           <div className="w-full max-w-7xl flex justify-between items-center text-white">
