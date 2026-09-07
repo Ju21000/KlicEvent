@@ -5,13 +5,13 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: Request) {
   try {
-    const { email, title, slug } = await request.json();
+    const { email, title, slug, isPaid } = await request.json();
 
     const eventUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://klic-event-3qvk.vercel.app'}/events/${slug}`;
     const uploadUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://klic-event-3qvk.vercel.app'}/upload?event=${slug}`;
 
     const data = await resend.emails.send({
-      from: 'KlicEvent <onboarding@resend.dev>', // Ou ton domaine personnalisé une fois validé
+      from: 'KlicEvent <onboarding@resend.dev>',
       to: [email],
       subject: `📸 Votre événement "${title}" est créé !`,
       html: `
@@ -24,6 +24,8 @@ export async function POST(request: Request) {
             <p style="margin: 0 0 10px 0;">🔗 <strong>Lien de gestion (Galerie & QR Code) :</strong><br><a href="${eventUrl}" style="color: #c084fc; word-break: break-all;">${eventUrl}</a></p>
             <p style="margin: 15px 0 0 0;">📤 <strong>Lien de dépôt pour vos invités :</strong><br><a href="${uploadUrl}" style="color: #38bdf8; word-break: break-all;">${uploadUrl}</a></p>
           </div>
+
+          ${isPaid ? '<p style="font-size: 14px; color: #38bdf8;">✅ Paiement validé. Votre facture officielle vous a été envoyée séparément par notre service de paiement.</p>' : ''}
 
           <p style="font-size: 14px; color: #94a3b8;">Conservez bien cet e-mail pour retrouver votre événement à tout moment. Bon événement !</p>
         </div>
