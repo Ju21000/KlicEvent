@@ -12,7 +12,7 @@ export default function Home() {
         </p>
         <div>
           <Link
-            href="/create"
+            href="/create-event"
             className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition duration-200 cursor-pointer shadow-lg hover:shadow-purple-500/25"
           >
             Créer un événement
