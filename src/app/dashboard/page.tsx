@@ -17,17 +17,19 @@ export default function DashboardPage() {
       
       if (!session) {
         setUser(null);
-      } else {
-        setUser(session.user);
+        setEvents([]);
+        setLoading(false);
+        return;
       }
 
-      let query = supabase.from('events').select('*').order('created_at', { ascending: false });
-      
-      if (session) {
-        query = query.eq('user_id', session.user.id);
-      }
+      setUser(session.user);
 
-      const { data, error } = await query;
+      // Requête strictement filtrée par l'ID de l'utilisateur connecté
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error("Erreur lors de la récupération des événements :", error);
