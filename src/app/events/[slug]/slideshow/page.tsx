@@ -8,49 +8,64 @@ export default function SlideshowPage({ params }: { params: Promise<{ slug: stri
   const resolvedParams = use(params);
   const slug = resolvedParams.slug;
 
+  const [eventData, setEventData] = useState<any>(null);
   const [photos, setPhotos] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
-    // 1. Charger les photos initiales
-    async function fetchPhotos() {
-      const { data } = await supabase
+    async function initSlideshow() {
+      // 1. Récupérer l'événement via son slug
+      const { data: event, error: eventError } = await supabase
+        .from('events')
+        .select('id, title')
+        .eq('slug', slug)
+        .single();
+
+      if (eventError || !event) {
+        console.error("Événement introuvable :", eventError);
+        return;
+      }
+
+      setEventData(event);
+
+      // 2. Charger les photos de cet événement précis
+      const { data: initialPhotos, error: photosError } = await supabase
         .from('photos')
         .select('*')
-        .eq('event_slug', slug)
+        .eq('event_id', event.id)
         .order('created_at', { ascending: false });
 
-      if (data && data.length > 0) {
-        setPhotos(data);
+      if (!photosError && initialPhotos) {
+        setPhotos(initialPhotos);
       }
+
+      // 3. Écouter les nouvelles photos en temps réel pour cet event_id
+      const channel = supabase
+        .channel(`photos-event-${event.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'photos',
+            filter: `event_id=eq.${event.id}`,
+          },
+          (payload) => {
+            setPhotos((prev) => [payload.new, ...prev]);
+            setCurrentIndex(0);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
 
-    fetchPhotos();
-
-    // 2. Écouter les nouvelles photos en temps réel
-    const channel = supabase
-      .channel(`public:photos:event_slug=eq.${slug}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'photos',
-          filter: `event_slug=eq.${slug}`,
-        },
-        (payload) => {
-          setPhotos((prev) => [payload.new, ...prev]);
-          setCurrentIndex(0); // Revient sur la toute dernière photo uploadée
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    initSlideshow();
   }, [slug]);
 
-  // Rotation automatique toutes les 5 secondes s'il y a plusieurs photos
+  // Rotation automatique toutes les 5 secondes
   useEffect(() => {
     if (photos.length <= 1) return;
 
@@ -69,7 +84,9 @@ export default function SlideshowPage({ params }: { params: Promise<{ slug: stri
           <span className="text-xs uppercase tracking-widest text-purple-400 font-semibold bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">
             Diaporama Live 🔴
           </span>
-          <h1 className="text-xl font-bold mt-1">Événement #{slug}</h1>
+          <h1 className="text-xl font-bold mt-1">
+            {eventData ? eventData.title : `Événement #${slug}`}
+          </h1>
         </div>
         <Link
           href={`/events/${slug}`}
@@ -90,7 +107,7 @@ export default function SlideshowPage({ params }: { params: Promise<{ slug: stri
           <div className="relative w-full h-full flex items-center justify-center">
             <img
               key={photos[currentIndex]?.id}
-              src={photos[currentIndex]?.url}
+              src={photos[currentIndex]?.image_url || photos[currentIndex]?.url}
               alt="Slide live"
               className="max-h-[80vh] max-w-[90vw] object-contain rounded-2xl shadow-2xl transition-all duration-700 animate-fade-in"
             />
