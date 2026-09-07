@@ -30,17 +30,45 @@ export default function CreateEventPage() {
 
       const currentPlan = planDetails[planType as keyof typeof planDetails];
 
-      // Redirection obligatoire vers Stripe si la formule est payante (29€)
+      // Génération du slug unique
+      const slug = title
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '') + '-' + Date.now().toString().slice(-4);
+
+      // 1. On crée d'abord l'événement dans Supabase (en pending si payant, paid si démo)
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .insert([
+          {
+            title,
+            date,
+            slug,
+            client_email: email,
+            max_photos: currentPlan.max,
+            plan_type: planType,
+            price: currentPlan.price,
+            payment_status: currentPlan.price > 0 ? 'pending' : 'paid',
+            user_id: userId,
+          }
+        ])
+        .select()
+        .single();
+
+      if (eventError) throw eventError;
+
+      // 2. Si la formule est payante, on appelle l'API de checkout avec l'eventId tout fraîchement créé
       if (currentPlan.price > 0) {
         const response = await fetch('/api/checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            title,
-            date,
-            email,
-            formula: planType,
-            userId,
+            eventId: eventData.id,
+            planType: planType,
+            email: email,
+            eventTitle: title,
           }),
         });
 
@@ -53,47 +81,19 @@ export default function CreateEventPage() {
         }
       }
 
-      // Traitement direct pour la formule gratuite (Démo)
-      const slug = title
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)+/g, '') + '-' + Date.now().toString().slice(-4);
-
-      const { data, error } = await supabase
-        .from('events')
-        .insert([
-          {
-            title,
-            date,
-            slug,
-            client_email: email,
-            max_photos: currentPlan.max,
-            plan_type: planType,
-            price: currentPlan.price,
-            payment_status: 'paid',
-            user_id: userId,
-          }
-        ])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Envoi de l'e-mail de confirmation via Resend
+      // 3. Traitement direct pour la formule gratuite (Démo)
       await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email,
-          title: data.title,
-          slug: data.slug,
+          title: eventData.title,
+          slug: eventData.slug,
           isPaid: false,
         }),
       });
 
-      router.push(`/events/${data.slug}`);
+      router.push(`/events/${eventData.slug}`);
 
     } catch (err) {
       console.error("Erreur lors de la création :", err);
