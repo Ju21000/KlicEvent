@@ -40,7 +40,10 @@ function UploadContent() {
           .from('event-photos')
           .upload(fileName, file);
 
-        if (storageError) throw storageError;
+        if (storageError) {
+          console.error("Erreur Storage:", storageError);
+          throw storageError;
+        }
 
         // 2. Récupération de l'URL publique de l'image
         const { data: publicUrlData } = supabase.storage
@@ -54,7 +57,10 @@ function UploadContent() {
           .from('photos')
           .insert([{ event_slug: eventParam, url: photoUrl }]);
 
-        if (dbError) throw dbError;
+        if (dbError) {
+          console.error("Erreur DB Insert:", dbError);
+          throw new Error(`Erreur Base de données : ${dbError.message}`);
+        }
       }
 
       setSuccess(true);
