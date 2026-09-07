@@ -5,8 +5,11 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const sessionId = searchParams.get('session_id');
+    const urlObj = new URL(request.url);
+    const sessionId = urlObj.searchParams.get('session_id');
+    
+    // On force l'URL de production Vercel pour éviter tout 'undefined'
+    const origin = 'https://klic-event-3qvk.vercel.app';
 
     if (!sessionId) {
       return NextResponse.json({ error: 'ID de session manquant' }, { status: 400 });
@@ -15,7 +18,7 @@ export async function GET(request: Request) {
     if (sessionId === 'free_demo') {
       return NextResponse.json({
         success: true,
-        galleryUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/events/demo-event`,
+        galleryUrl: `${origin}/events/demo-event`,
       });
     }
 
@@ -26,7 +29,7 @@ export async function GET(request: Request) {
     }
 
     const eventSlug = session.id.slice(-8);
-    const galleryUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/events/${eventSlug}`;
+    const galleryUrl = `${origin}/events/${eventSlug}`;
 
     return NextResponse.json({
       success: true,
