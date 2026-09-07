@@ -1,175 +1,167 @@
 'use client';
 
 import { use, useEffect, useState } from 'react';
-import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import JSZip from 'jszip';
-import { QRCodeSVG } from 'qrcode.react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
-export default function EventGalleryPage({ params }: { params: Promise<{ slug: string }> }) {
+export default function EventPage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = use(params);
   const slug = resolvedParams.slug;
 
+  const [event, setEvent] = useState<any>(null);
   const [photos, setPhotos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [downloadingZip, setDownloadingZip] = useState(false);
-  const [currentUrl, setCurrentUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
-    setCurrentUrl(window.location.origin);
+    async function fetchEventAndPhotos() {
+      // 1. Récupérer l'événement via son slug
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .select('*')
+        .eq('slug', slug)
+        .single();
 
-    async function fetchPhotos() {
-      const { data, error } = await supabase
+      if (eventError || !eventData) {
+        router.push('/');
+        return;
+      }
+
+      setEvent(eventData);
+
+      // 2. Récupérer les photos associées à cet événement
+      const { data: photosData } = await supabase
         .from('photos')
         .select('*')
-        .eq('event_slug', slug)
+        .eq('event_id', eventData.id)
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
-        setPhotos(data);
+      if (photosData) {
+        setPhotos(photosData);
       }
+
       setLoading(false);
+
+      // 3. Activer l'écoute Realtime pour les nouvelles photos
+      const channel = supabase
+        .channel(`public:photos:event_id=eq.${eventData.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'photos',
+            filter: `event_id=eq.${eventData.id}`,
+          },
+          (payload) => {
+            setPhotos((prevPhotos) => [payload.new, ...prevPhotos]);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
 
-    fetchPhotos();
-  }, [slug]);
+    fetchEventAndPhotos();
+  }, [slug, router]);
 
-  const handleDeletePhoto = async (photoId: string, photoUrl: string) => {
-    if (!confirm("Veux-tu vraiment supprimer cette photo ?")) return;
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !event) return;
 
-    try {
-      const urlParts = photoUrl.split('/event-photos/');
-      if (urlParts.length > 1) {
-        await supabase.storage.from('event-photos').remove([urlParts[1]]);
+    setUploading(true);
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36.substring(2))}.${fileExt}`;
+      const filePath = `${event.id}/${fileName}`;
+
+      // Upload du fichier dans le bucket Storage de Supabase (suppose un bucket nommé 'event-photos')
+      const { error: uploadError } = await supabase.storage
+        .from('event-photos')
+        .upload(filePath, file);
+
+      if (!uploadError) {
+        // Récupération de l'URL publique de l'image
+        const { data: publicUrlData } = supabase.storage
+          .from('event-photos')
+          .getPublicUrl(filePath);
+
+        // Enregistrement de la photo dans la table 'photos'
+        await supabase.from('photos').insert([
+          {
+            event_id: event.id,
+            url: publicUrlData.publicUrl,
+          },
+        ]);
       }
-
-      const { error } = await supabase.from('photos').delete().eq('id', photoId);
-      if (error) throw error;
-
-      setPhotos((prev) => prev.filter((p) => p.id !== photoId));
-    } catch (error) {
-      console.error("Erreur lors de la suppression :", error);
-      alert("Impossible de supprimer la photo.");
     }
+
+    setUploading(false);
   };
 
-  const handleDownloadAll = async () => {
-    if (photos.length === 0) return;
-
-    setDownloadingZip(true);
-    const zip = new JSZip();
-    const folder = zip.folder(`klic-event-${slug}`);
-
-    try {
-      for (let i = 0; i < photos.length; i++) {
-        const photo = photos[i];
-        const response = await fetch(photo.url);
-        const blob = await response.blob();
-        const extension = photo.url.split('.').pop()?.split('?')[0] || 'jpg';
-        folder?.file(`photo-${i + 1}.${extension}`, blob);
-      }
-
-      const content = await zip.generateAsync({ type: 'blob' });
-      const url = window.URL.createObjectURL(content);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `evenement-${slug}-photos.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Erreur ZIP :", error);
-    } finally {
-      setDownloadingZip(false);
-    }
-  };
-
-  const uploadLink = `${currentUrl}/upload?event=${slug}`;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+        Chargement de l'événement...
+      </div>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white p-6 flex flex-col items-center">
-      <div className="w-full max-w-4xl space-y-8">
-        {/* En-tête de la galerie */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
+    <main className="min-h-screen bg-slate-950 text-white p-6 md:p-12">
+      <div className="max-w-6xl mx-auto space-y-8">
+        
+        {/* En-tête */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl gap-4">
           <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-purple-400 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">
-              Galerie Événement
-            </span>
-            <h1 className="text-3xl font-bold mt-2">Événement #{slug}</h1>
-            <p className="text-slate-400 text-sm mt-1">Scanne le QR code pour balancer tes photos en direct !</p>
+            <span className="text-xs uppercase tracking-wider text-purple-400 font-semibold">Galerie Live KlicEvent</span>
+            <h1 className="text-3xl font-bold mt-1">{event.title}</h1>
           </div>
-
-          {/* QR Code d'accès rapide pour les invités */}
-          {currentUrl && (
-            <div className="bg-white p-3 rounded-xl shadow-lg flex flex-col items-center">
-              <QRCodeSVG value={uploadLink} size={110} />
-              <span className="text-[10px] text-slate-900 font-bold mt-2 uppercase tracking-wider">Flsh pour uploader</span>
-            </div>
-          )}
-        </div>
-
-        {/* Barre d'actions organisateur */}
-        <div className="flex flex-wrap gap-3 items-center justify-between bg-slate-900/50 border border-slate-800 p-4 rounded-xl">
-          <Link href="/" className="text-sm text-slate-400 hover:text-white">
-            ← Accueil KlicEvent
-          </Link>
-          <div className="flex flex-wrap gap-3 items-center">
-            {photos.length > 0 && (
-              <button
-                onClick={handleDownloadAll}
-                disabled={downloadingZip}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition shadow-lg cursor-pointer"
-              >
-                {downloadingZip ? 'Génération...' : '📥 Tout télécharger (ZIP)'}
-              </button>
-            )}
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <label className="flex-1 md:flex-none text-center px-5 py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-xl transition shadow-lg cursor-pointer">
+              {uploading ? 'Envoi en cours...' : '📸 Ajouter des photos'}
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handleFileUpload}
+                disabled={uploading}
+                className="hidden"
+              />
+            </label>
             <Link
-              href={`/events/${slug}/slideshow`}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-purple-300 text-sm font-medium rounded-lg transition border border-slate-700"
+              href="/dashboard"
+              className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl transition border border-slate-700"
             >
-              🖥️ Diaporama Live
-            </Link>
-            <Link
-              href={`/upload?event=${slug}`}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition shadow-lg"
-            >
-              Déposer 📸
+              Dashboard
             </Link>
           </div>
         </div>
 
-        {/* Grille de photos */}
-        {loading ? (
-          <p className="text-center text-purple-400 animate-pulse">Chargement des souvenirs...</p>
-        ) : photos.length === 0 ? (
-          <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-12 text-center space-y-4">
-            <div className="w-16 h-16 bg-slate-800 text-slate-500 rounded-full flex items-center justify-center mx-auto text-2xl">
-              🖼️
-            </div>
-            <h2 className="text-xl font-semibold text-slate-300">Aucune photo pour le moment</h2>
-            <p className="text-slate-500 text-sm max-w-md mx-auto">
-              Scanne le QR code ci-dessus pour envoyer les premiers clichés !
-            </p>
+        {/* Grille des photos en temps réel */}
+        {photos.length === 0 ? (
+          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-16 text-center space-y-3">
+            <p className="text-xl text-slate-400 font-medium">Aucune photo pour le moment.</p>
+            <p className="text-sm text-slate-500">Sois le premier à immortaliser un moment de cet événement !</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {photos.map((photo) => (
-              <div key={photo.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg group relative">
-                <div className="aspect-square relative overflow-hidden bg-slate-950">
-                  <img
-                    src={photo.url}
-                    alt="Photo événement"
-                    className="object-cover w-full h-full group-hover:scale-105 transition duration-300"
-                  />
-                  <button
-                    onClick={() => handleDeletePhoto(photo.id, photo.url)}
-                    className="absolute top-3 right-3 bg-red-600/80 hover:bg-red-600 text-white p-2 rounded-lg opacity-0 group-hover:opacity-100 transition duration-200 shadow-lg cursor-pointer"
-                    title="Supprimer"
-                  >
-                    🗑️
-                  </button>
-                </div>
+              <div
+                key={photo.id}
+                className="relative aspect-square rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 shadow-xl group"
+              >
+                <img
+                  src={photo.url}
+                  alt="Photo de l'événement"
+                  className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                />
               </div>
             ))}
           </div>
