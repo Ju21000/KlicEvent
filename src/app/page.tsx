@@ -173,7 +173,7 @@ export default function Home() {
 
           <ul className="text-sm text-slate-300 space-y-2 max-w-sm mx-auto text-left py-2">
             <li className="flex items-center gap-2">
-              <span className="text-purple-400">✓</span> Photos illimitées en haute définition
+              <span className="text-purple-400">✓</span> Jusqu'à 300 photos en haute définition
             </li>
             <li className="flex items-center gap-2">
               <span className="text-purple-400">✓</span> Nombre d’invités illimité
