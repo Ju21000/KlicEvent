@@ -91,8 +91,8 @@ export default function CreateEventPage() {
               onChange={(e) => setFormula(e.target.value)}
               className="w-full px-4 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-purple-500"
             >
-              <option value="demo">Formule Démo (Gratuite) (0€ - max 20 photos)</option>
-              <option value="standard">Formule Standard (15€ - Illimité)</option>
+              <option value="demo">Formule Démo (Gratuit) - 20 photos, dispo 7 jours</option>
+              <option value="standard">Formule Illimitée (29€) - Illimité, dispo 1 mois</option>
             </select>
           </div>
 
