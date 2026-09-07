@@ -13,6 +13,7 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
   const [photos, setPhotos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -150,7 +151,8 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
             {photos.map((photo) => (
               <div
                 key={photo.id}
-                className="relative aspect-square rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 shadow-xl group"
+                onClick={() => setSelectedPhoto(photo.url)}
+                className="relative aspect-square rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 shadow-xl group cursor-pointer"
               >
                 <img
                   src={photo.url}
@@ -162,6 +164,28 @@ export default function EventPage({ params }: { params: Promise<{ slug: string }
           </div>
         )}
       </div>
+
+      {/* Modal Diaporama / Plein écran */}
+      {selectedPhoto && (
+        <div 
+          onClick={() => setSelectedPhoto(null)}
+          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div className="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center">
+            <img
+              src={selectedPhoto}
+              alt="Agrandissement"
+              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+            />
+            <button
+              onClick={() => setSelectedPhoto(null)}
+              className="absolute top-4 right-4 bg-slate-800/80 hover:bg-slate-700 text-white w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold border border-slate-700 transition"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
