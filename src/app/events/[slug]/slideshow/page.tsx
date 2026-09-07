@@ -94,8 +94,8 @@ export default function SlideshowPage({ params }: { params: Promise<{ slug: stri
           </h1>
         </div>
         <Link
-          href={`/events/${slug}`}
-          className="px-4 py-2 bg-slate-800/80 hover:bg-slate-700 text-xs md:text-sm font-medium rounded-lg backdrop-blur-md transition"
+          href="/dashboard"
+          className="px-4 py-2 bg-slate-800/80 hover:bg-slate-700 text-xs md:text-sm font-medium rounded-lg backdrop-blur-md transition cursor-pointer"
         >
           Quitter le live ✕
         </Link>
