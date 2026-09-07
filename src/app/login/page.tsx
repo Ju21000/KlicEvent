@@ -43,9 +43,9 @@ export default function LoginPage() {
             www.KlicEvent.com
           </Link>
           <h1 className="text-2xl font-bold">
-            {isSignUp ? 'Créer un compte Organisateur' : 'Connexion Organisateur'}
+            {isSignUp ? 'Créer un espace Organisateur' : 'Espace Organisateur'}
           </h1>
-          <p className="text-xs text-slate-400">Accède à ton espace de gestion et tes diaporamas live.</p>
+          <p className="text-xs text-slate-400">Retrouve tes événements et tes diaporamas live.</p>
         </div>
 
         {error && (
@@ -83,7 +83,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold text-sm rounded-xl transition duration-200 shadow-lg cursor-pointer disabled:opacity-50"
           >
-            {loading ? 'Chargement...' : isSignUp ? "S'inscrire" : 'Se connecter'}
+            {loading ? 'Chargement...' : isSignUp ? "S'inscrire" : 'Accéder à mon espace'}
           </button>
         </form>
 
@@ -93,7 +93,7 @@ export default function LoginPage() {
             onClick={() => setIsSignUp(!isSignUp)}
             className="text-purple-400 hover:underline font-medium cursor-pointer"
           >
-            {isSignUp ? 'Déjà un compte ? Connecte-toi' : "Pas de compte ? Inscris-toi ici"}
+            {isSignUp ? 'Déjà un compte ? Connecte-toi' : "Pas de compte ? Crée ton espace ici"}
           </button>
           <Link href="/" className="text-slate-500 hover:text-slate-300">
             ← Retour à l'accueil
