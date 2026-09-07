@@ -25,7 +25,7 @@ export default function DashboardPage() {
       const { data: eventsData } = await supabase
         .from('events')
         .select('*')
-        .eq('user_id', session.user.id) // Filtrage strict par l'ID utilisateur connecté
+        .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
 
       if (eventsData) {
@@ -49,33 +49,20 @@ export default function DashboardPage() {
     }
 
     try {
-      // 1. Supprimer les photos du stockage Supabase
-      const { data: photosData } = await supabase
-        .from('photos')
-        .select('url')
-        .eq('event_id', eventId);
+      // Appel de la route API backend sécurisée avec les droits admin
+      const response = await fetch('/api/delete-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId }),
+      });
 
-      if (photosData && photosData.length > 0) {
-        for (const photo of photosData) {
-          const urlParts = photo.url.split('/event-photos/');
-          if (urlParts.length > 1) {
-            await supabase.storage.from('event-photos').remove([urlParts[1]]);
-          }
-        }
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erreur lors de la suppression");
       }
 
-      // 2. Supprimer les lignes de la table photos
-      await supabase.from('photos').delete().eq('event_id', eventId);
-
-      // 3. Supprimer l'événement de la table events de façon stricte par son ID
-      const { error } = await supabase
-        .from('events')
-        .delete()
-        .eq('id', eventId);
-
-      if (error) throw error;
-
-      // 4. Mettre à jour l'état local immédiatement
+      // Mise à jour immédiate de l'affichage local
       setEvents((prev) => prev.filter((evt) => evt.id !== eventId));
     } catch (err) {
       console.error("Erreur lors de la suppression de l'événement :", err);
