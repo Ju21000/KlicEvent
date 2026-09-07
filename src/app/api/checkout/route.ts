@@ -6,11 +6,12 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 export async function POST(request: Request) {
   try {
     const { title, date, formula } = await request.json();
+    const origin = request.headers.get('origin') || 'https://klic-event-3qvk.vercel.app';
 
-    const unitAmount = formula === 'standard' ? 1500 : 0; // 15€ ou gratuit
+    const unitAmount = formula === 'standard' ? 1500 : 0;
 
     if (unitAmount === 0) {
-      return NextResponse.json({ url: `${process.env.NEXT_PUBLIC_BASE_URL}/events/success?session_id=free_demo` });
+      return NextResponse.json({ url: `${origin}/events/success?session_id=free_demo` });
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -28,8 +29,8 @@ export async function POST(request: Request) {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/events/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/create-event`,
+      success_url: `${origin}/events/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/create-event`,
       metadata: {
         title,
         date,
