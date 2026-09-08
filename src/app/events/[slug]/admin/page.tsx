@@ -4,6 +4,7 @@ import { use, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import JSZip from 'jszip';
 
 export default function AdminGalleryPage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = use(params);
@@ -12,6 +13,8 @@ export default function AdminGalleryPage({ params }: { params: Promise<{ slug: s
   const [event, setEvent] = useState<any>(null);
   const [photos, setPhotos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingZip, setDownloadingZip] = useState(false);
+  const [zipProgress, setZipProgress] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -19,7 +22,9 @@ export default function AdminGalleryPage({ params }: { params: Promise<{ slug: s
 
     async function initAdmin() {
       // 1. Vérification session organisateur
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         router.push('/login');
         return;
@@ -108,6 +113,62 @@ export default function AdminGalleryPage({ params }: { params: Promise<{ slug: s
     }
   };
 
+  // Téléchargement de l'archive ZIP
+  const handleDownloadZip = async () => {
+    if (photos.length === 0) {
+      alert('Aucune photo à télécharger.');
+      return;
+    }
+
+    setDownloadingZip(true);
+    setZipProgress(0);
+
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder(`photos-${slug}`) || zip;
+
+      let completed = 0;
+
+      await Promise.all(
+        photos.map(async (photo, index) => {
+          try {
+            const imageUrl = photo.url || photo.image_url;
+            const res = await fetch(imageUrl);
+            const blob = await res.blob();
+
+            const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+            const filename = `photo-${String(index + 1).padStart(3, '0')}.${ext}`;
+
+            folder.file(filename, blob);
+          } catch (fetchErr) {
+            console.error('Erreur lors du téléchargement d’une photo :', fetchErr);
+          } finally {
+            completed++;
+            setZipProgress(Math.round((completed / photos.length) * 100));
+          }
+        })
+      );
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      const downloadUrl = URL.createObjectURL(content);
+
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `${slug}-photos.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error('Erreur génération ZIP :', err);
+      alert("Une erreur est survenue lors de la création de l'archive ZIP.");
+    } finally {
+      setDownloadingZip(false);
+      setZipProgress(0);
+    }
+  };
+
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
@@ -130,7 +191,15 @@ export default function AdminGalleryPage({ params }: { params: Promise<{ slug: s
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={handleDownloadZip}
+              disabled={downloadingZip || photos.length === 0}
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold rounded-xl transition shadow-lg flex items-center gap-1.5 cursor-pointer"
+            >
+              {downloadingZip ? `Archive en cours (${zipProgress}%) ⏳` : '📥 Télécharger ZIP'}
+            </button>
+
             <Link
               href={`/events/${slug}/slideshow`}
               target="_blank"
@@ -138,6 +207,7 @@ export default function AdminGalleryPage({ params }: { params: Promise<{ slug: s
             >
               📺 Lancer le Live
             </Link>
+
             <Link
               href="/dashboard"
               className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-xl transition border border-slate-700"
