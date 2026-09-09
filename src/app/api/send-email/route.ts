@@ -7,33 +7,106 @@ export async function POST(request: Request) {
   try {
     const { email, title, slug, isPaid } = await request.json();
 
-    const eventUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://klic-event-3qvk.vercel.app'}/events/${slug}`;
-    const uploadUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://klic-event-3qvk.vercel.app'}/upload?event=${slug}`;
+    const baseUrl =
+      process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ||
+      'https://www.klicevent.com';
+
+    // Routes réelles de l'application
+    const guestUrl = `${baseUrl}/events/${slug}`;
+    const slideshowUrl = `${baseUrl}/events/${slug}/slideshow`;
+    const adminUrl = `${baseUrl}/events/${slug}/admin`;
+    const dashboardUrl = `${baseUrl}/dashboard`;
+
+    // Si tu as validé ton domaine klicevent.com dans Resend, utilise 'KlicEvent <bonjour@klicevent.com>'
+    // Sinon laisse 'KlicEvent <onboarding@resend.dev>' pour tester
+    const senderEmail =
+      process.env.RESEND_FROM_EMAIL || 'KlicEvent <onboarding@resend.dev>';
 
     const data = await resend.emails.send({
-      from: 'KlicEvent <onboarding@resend.dev>',
+      from: senderEmail,
       to: [email],
-      subject: `📸 Votre événement "${title}" est créé !`,
+      subject: `Accès à votre événement : ${title}`,
       html: `
-        <div style="font-family: sans-serif; background-color: #020617; color: #ffffff; padding: 32px; border-radius: 12px;">
-          <h1 style="color: #c084fc; font-size: 24px;">KlicEvent 📸</h1>
-          <p>Bonjour,</p>
-          <p>Votre espace photo pour l'événement <strong>${title}</strong> est prêt à l'emploi.</p>
-          
-          <div style="background-color: #0f172a; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #1e293b;">
-            <p style="margin: 0 0 10px 0;">🔗 <strong>Lien de gestion (Galerie & QR Code) :</strong><br><a href="${eventUrl}" style="color: #c084fc; word-break: break-all;">${eventUrl}</a></p>
-            <p style="margin: 15px 0 0 0;">📤 <strong>Lien de dépôt pour vos invités :</strong><br><a href="${uploadUrl}" style="color: #38bdf8; word-break: break-all;">${uploadUrl}</a></p>
-          </div>
+        <!DOCTYPE html>
+        <html lang="fr">
+          <head>
+            <meta charset="utf-8" />
+          </head>
+          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 32px 16px;">
+            <div style="max-width: 560px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+              
+              <div style="margin-bottom: 24px;">
+                <span style="font-size: 20px; font-weight: 800; color: #7c3aed;">KlicEvent</span>
+              </div>
 
-          ${isPaid ? '<p style="font-size: 14px; color: #38bdf8;">✅ Paiement validé. Votre facture officielle vous a été envoyée séparément par notre service de paiement.</p>' : ''}
+              <h1 style="font-size: 22px; font-weight: 700; color: #0f172a; margin: 0 0 12px 0;">
+                Votre événement est prêt !
+              </h1>
+              
+              <p style="font-size: 15px; line-height: 1.5; color: #475569; margin: 0 0 24px 0;">
+                Bonjour, votre espace photo pour <strong>${title}</strong> est configuré. Retrouvez ci-dessous l'ensemble de vos accès :
+              </p>
 
-          <p style="font-size: 14px; color: #94a3b8;">Conservez bien cet e-mail pour retrouver votre événement à tout moment. Bon événement !</p>
-        </div>
+              <!-- Carte Dashboard -->
+              <div style="background-color: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 12px; padding: 20px; margin-bottom: 20px; text-align: center;">
+                <p style="font-size: 13px; font-weight: 600; color: #6d28d9; margin: 0 0 12px 0;">
+                  ESPACE ORGANISATEUR &amp; QR CODE
+                </p>
+                <a href="${dashboardUrl}" style="display: inline-block; background-color: #7c3aed; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+                  Ouvrir mon tableau de bord
+                </a>
+              </div>
+
+              <!-- Bloc des liens directs -->
+              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                
+                <div style="margin-bottom: 16px;">
+                  <strong style="font-size: 14px; color: #0f172a; display: block;">📸 Lien invité (prise de photo) :</strong>
+                  <p style="font-size: 12px; color: #64748b; margin: 2px 0 6px 0;">À partager à vos proches ou afficher via le QR code :</p>
+                  <a href="${guestUrl}" style="font-size: 13px; color: #7c3aed; word-break: break-all; text-decoration: none;">${guestUrl}</a>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                  <strong style="font-size: 14px; color: #0f172a; display: block;">🖥️ Diaporama en direct (grand écran) :</strong>
+                  <p style="font-size: 12px; color: #64748b; margin: 2px 0 6px 0;">À projeter pendant la soirée :</p>
+                  <a href="${slideshowUrl}" style="font-size: 13px; color: #7c3aed; word-break: break-all; text-decoration: none;">${slideshowUrl}</a>
+                </div>
+
+                <div>
+                  <strong style="font-size: 14px; color: #0f172a; display: block;">⚙️ Modération directe &amp; Export ZIP :</strong>
+                  <a href="${adminUrl}" style="font-size: 13px; color: #7c3aed; word-break: break-all; text-decoration: none;">${adminUrl}</a>
+                </div>
+
+              </div>
+
+              ${
+                isPaid
+                  ? `
+                <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px; margin-bottom: 24px;">
+                  <p style="font-size: 13px; color: #065f46; margin: 0;">
+                    ✅ <strong>Paiement validé.</strong> Votre reçu officiel vous a été envoyé séparément par Stripe.
+                  </p>
+                </div>
+              `
+                  : ''
+              }
+
+              <p style="font-size: 12px; line-height: 1.5; color: #94a3b8; margin: 0;">
+                Conservez cet e-mail pour retrouver vos liens à tout moment.<br />
+                Une question ? Répondez simplement à ce message.
+              </p>
+
+            </div>
+          </body>
+        </html>
       `,
     });
 
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+    return NextResponse.json(
+      { error: (error as Error).message },
+      { status: 500 }
+    );
   }
 }
