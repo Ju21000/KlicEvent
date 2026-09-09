@@ -107,7 +107,7 @@ function CreateEventForm() {
         }),
       });
 
-      router.push(`/events/${eventData.slug}`);
+      router.push('/dashboard');
     } catch (err) {
       console.error('Erreur lors de la création :', err);
       alert("Une erreur est survenue lors de la création de l'événement.");
