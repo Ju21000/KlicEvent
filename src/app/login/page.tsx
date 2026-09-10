@@ -42,12 +42,17 @@ function LoginForm() {
           return;
         }
 
-        // Déclenche l'e-mail d'alerte vers ton adresse en arrière-plan
-        fetch('/api/notify-signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userEmail: email }),
-        }).catch((err) => console.error('Erreur alerte inscription :', err));
+        // Notification admin sécurisée avec await et keepalive
+        try {
+          await fetch('/api/notify-signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userEmail: email }),
+            keepalive: true,
+          });
+        } catch (notifyErr) {
+          console.error('Erreur alerte inscription :', notifyErr);
+        }
 
         if (data.session) {
           router.push(redirectTo);
