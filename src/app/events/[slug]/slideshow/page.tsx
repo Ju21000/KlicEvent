@@ -23,7 +23,6 @@ export default function SlideshowPage({
   const [loading, setLoading] = useState(true);
   const [guestUrl, setGuestUrl] = useState('');
 
-  // Détection de l'orientation d'une image
   const checkOrientation = (url: string): Promise<boolean> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -64,7 +63,6 @@ export default function SlideshowPage({
       }
       setLoading(false);
 
-      // Écoute des nouvelles photos en direct
       const channel = supabase
         .channel(`slideshow-${eventData.id}`)
         .on(
@@ -92,7 +90,6 @@ export default function SlideshowPage({
     fetchPhotos();
   }, [slug]);
 
-  // Défilement automatique
   useEffect(() => {
     if (photos.length <= 1) return;
 
@@ -125,31 +122,31 @@ export default function SlideshowPage({
   return (
     <main className="relative w-screen h-screen bg-black overflow-hidden flex items-center justify-center select-none">
       {photos.length > 0 ? (
-        <div className="absolute inset-0 flex items-center justify-center p-6 sm:p-10 transition-opacity duration-1000 ease-in-out">
+        <div className="absolute inset-0 flex items-center justify-center pb-8">
           {showDuo ? (
-            /* Mode Duo centré, équilibré avec ratio strict 9/16 */
-            <div className="flex items-center justify-center gap-6 md:gap-10 w-full h-[85vh]">
+            /* Duo portrait strictement symétrique et centré */
+            <div className="flex items-center justify-center gap-8 h-[80vh]">
               {[currentPhoto, nextPhoto].map((photo, i) => (
                 <div
                   key={photo.id + i}
-                  className="relative h-full aspect-[9/16] max-w-[45vw] rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center bg-black/40"
+                  className="h-full w-[45vh] max-w-[40vw] rounded-3xl overflow-hidden shadow-2xl border border-white/10 bg-zinc-950 flex items-center justify-center"
                 >
                   <img
                     src={photo.url}
                     alt="Photo live"
-                    className="w-full h-full object-cover rounded-3xl transition-transform duration-[7000ms] ease-out scale-105"
+                    className="w-full h-full object-cover rounded-3xl"
                   />
                 </div>
               ))}
             </div>
           ) : (
-            /* Mode Solo (paysage ou portrait seul) */
-            <div className="relative max-w-full max-h-full rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center bg-black/40">
+            /* Solo (paysage ou portrait seul) */
+            <div className="h-[80vh] max-w-[85vw] rounded-3xl overflow-hidden shadow-2xl border border-white/10 bg-zinc-950 flex items-center justify-center">
               <img
                 key={currentPhoto.id}
                 src={currentPhoto.url}
                 alt="Photo live"
-                className="max-w-full max-h-[85vh] object-contain rounded-3xl transition-transform duration-[7000ms] ease-out scale-105"
+                className="max-h-full max-w-full object-contain rounded-3xl"
               />
             </div>
           )}
@@ -163,9 +160,9 @@ export default function SlideshowPage({
 
       {/* Bloc QR code en bas à droite */}
       {guestUrl && (
-        <div className="absolute bottom-6 right-6 z-20 flex items-center gap-3 bg-black/80 border border-white/10 p-3 rounded-2xl backdrop-blur-md shadow-2xl">
+        <div className="absolute bottom-6 right-6 z-20 flex items-center gap-3 bg-black/85 border border-white/15 p-3 rounded-2xl backdrop-blur-md shadow-2xl">
           <div className="bg-white p-1.5 rounded-xl">
-            <QRCodeSVG value={guestUrl} size={84} level="M" />
+            <QRCodeSVG value={guestUrl} size={80} level="M" />
           </div>
           <div className="text-left text-white pr-2">
             <p className="text-xs font-bold leading-tight">Scannez pour</p>
