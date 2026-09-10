@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState, useRef } from 'react';
+import { use, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -99,7 +99,6 @@ export default function SlideshowPage({
     const interval = setInterval(() => {
       setCurrentIndex((prev) => {
         const current = photos[prev];
-        // Si on affichait un duo de portraits, on avance de 2 crans si possible
         const nextIdx = (prev + 1) % photos.length;
         if (current?.isPortrait && photos[nextIdx]?.isPortrait && photos.length > 2) {
           return (prev + 2) % photos.length;
@@ -128,23 +127,23 @@ export default function SlideshowPage({
       {photos.length > 0 ? (
         <div className="absolute inset-0 flex items-center justify-center p-6 sm:p-10 transition-opacity duration-1000 ease-in-out">
           {showDuo ? (
-            /* Mode Duo pour 2 photos portrait côte à côte */
-            <div className="flex items-center justify-center gap-6 md:gap-10 w-full h-full max-h-[85vh]">
+            /* Mode Duo centré, équilibré avec ratio strict 9/16 */
+            <div className="flex items-center justify-center gap-6 md:gap-10 w-full h-[85vh]">
               {[currentPhoto, nextPhoto].map((photo, i) => (
                 <div
                   key={photo.id + i}
-                  className="relative h-full max-w-[48%] rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center bg-black/40"
+                  className="relative h-full aspect-[9/16] max-w-[45vw] rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center bg-black/40"
                 >
                   <img
                     src={photo.url}
                     alt="Photo live"
-                    className="max-w-full max-h-full object-contain rounded-3xl transition-transform duration-[7000ms] ease-out scale-105"
+                    className="w-full h-full object-cover rounded-3xl transition-transform duration-[7000ms] ease-out scale-105"
                   />
                 </div>
               ))}
             </div>
           ) : (
-            /* Mode Solo (paysage ou portrait isolé) */
+            /* Mode Solo (paysage ou portrait seul) */
             <div className="relative max-w-full max-h-full rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center bg-black/40">
               <img
                 key={currentPhoto.id}
