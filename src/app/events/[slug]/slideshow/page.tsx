@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface Photo {
   id: string;
@@ -19,9 +20,13 @@ export default function SlideshowPage({
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [guestUrl, setGuestUrl] = useState('');
 
-  // 1. Chargement des photos et écoute temps réel
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setGuestUrl(`${window.location.origin}/events/${slug}`);
+    }
+
     async function fetchPhotos() {
       const { data: eventData } = await supabase
         .from('events')
@@ -42,7 +47,6 @@ export default function SlideshowPage({
       }
       setLoading(false);
 
-      // Réception instantanée d'une nouvelle photo
       const channel = supabase
         .channel(`slideshow-${eventData.id}`)
         .on(
@@ -68,7 +72,6 @@ export default function SlideshowPage({
     fetchPhotos();
   }, [slug]);
 
-  // 2. Défilement automatique toutes les 6 secondes
   useEffect(() => {
     if (photos.length <= 1) return;
 
@@ -87,35 +90,53 @@ export default function SlideshowPage({
     );
   }
 
-  if (photos.length === 0) {
-    return (
-      <main className="min-h-screen bg-black text-white flex items-center justify-center p-6 text-center">
-        <p className="text-slate-400">En attente de la première photo...</p>
-      </main>
-    );
-  }
-
   return (
     <main className="relative w-screen h-screen bg-black overflow-hidden flex items-center justify-center select-none">
-      {photos.map((photo, index) => {
-        const isActive = index === currentIndex;
-        return (
-          <div
-            key={photo.id}
-            className={`absolute inset-0 flex items-center justify-center transition-opacity duration-1000 ease-in-out ${
-              isActive ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
-            }`}
-          >
-            <img
-              src={photo.url}
-              alt="Photo de l'événement"
-              className={`max-w-full max-h-full object-contain transition-transform duration-[6000ms] ease-out ${
-                isActive ? 'scale-105' : 'scale-100'
+      {/* Diaporama avec fondu et zoom doux */}
+      {photos.length > 0 ? (
+        photos.map((photo, index) => {
+          const isActive = index === currentIndex;
+          return (
+            <div
+              key={photo.id}
+              className={`absolute inset-0 flex items-center justify-center transition-opacity duration-1000 ease-in-out ${
+                isActive ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
               }`}
-            />
+            >
+              <img
+                src={photo.url}
+                alt="Photo live"
+                className={`max-w-full max-h-full object-contain transition-transform duration-[6000ms] ease-out ${
+                  isActive ? 'scale-105' : 'scale-100'
+                }`}
+              />
+            </div>
+          );
+        })
+      ) : (
+        <div className="text-center text-slate-400 z-10">
+          <p className="text-lg font-medium">En attente de la première photo...</p>
+          <p className="text-xs text-slate-600 mt-1">Scannez le QR code pour commencer</p>
+        </div>
+      )}
+
+      {/* Bloc QR code en bas à droite */}
+      {guestUrl && (
+        <div className="absolute bottom-6 right-6 z-20 flex items-center gap-3 bg-black/80 border border-white/10 p-3 rounded-2xl backdrop-blur-md shadow-2xl">
+          <div className="bg-white p-1.5 rounded-xl">
+            <QRCodeSVG value={guestUrl} size={84} level="M" />
           </div>
-        );
-      })}
+          <div className="text-left text-white pr-2">
+            <p className="text-xs font-bold leading-tight">Scannez pour</p>
+            <p className="text-xs font-bold leading-tight">ajouter une photo</p>
+          </div>
+        </div>
+      )}
+
+      {/* Mention KlicEvent en bas à gauche */}
+      <div className="absolute bottom-6 left-6 z-20 text-xs text-slate-500 font-medium">
+        www.KlicEvent.com
+      </div>
     </main>
   );
 }
