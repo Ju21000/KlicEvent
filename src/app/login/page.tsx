@@ -42,14 +42,19 @@ function LoginForm() {
           return;
         }
 
-        // Si la session est ouverte directement (pas de confirmation email requise dans Supabase)
+        // Déclenche l'e-mail d'alerte vers ton adresse en arrière-plan
+        fetch('/api/notify-signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userEmail: email }),
+        }).catch((err) => console.error('Erreur alerte inscription :', err));
+
         if (data.session) {
           router.push(redirectTo);
           router.refresh();
           return;
         }
 
-        // Si confirmation email requise par Supabase
         setSuccessMessage('Compte créé ! Un lien de confirmation a été envoyé sur ta boîte mail.');
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
