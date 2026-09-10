@@ -59,7 +59,6 @@ export default function GuestUploadPage({
     setErrorMessage('');
 
     try {
-      // 1. Vérification quota photos
       const { count, error: countError } = await supabase
         .from('photos')
         .select('*', { count: 'exact', head: true })
@@ -71,7 +70,6 @@ export default function GuestUploadPage({
         return;
       }
 
-      // 2. Upload des fichiers
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const fileExt = file.name.split('.').pop();
@@ -120,22 +118,21 @@ export default function GuestUploadPage({
   }
 
   return (
-    <main className="relative min-h-screen bg-[#07050f] text-white flex flex-col justify-between p-6 max-w-md mx-auto overflow-hidden selection:bg-purple-600">
-      
-      {/* Halos d'ambiance lumineuse festive */}
-      <div className="absolute top-[-10%] left-[-20%] w-[320px] h-[320px] bg-purple-600/20 rounded-full blur-[110px] pointer-events-none" />
-      <div className="absolute bottom-[5%] right-[-20%] w-[320px] h-[320px] bg-pink-600/15 rounded-full blur-[110px] pointer-events-none" />
+    <main className="relative min-h-screen bg-[#07050f] text-white flex flex-col justify-between p-4 sm:p-6 max-w-lg mx-auto overflow-y-auto selection:bg-purple-600">
+      {/* Halos d'ambiance */}
+      <div className="fixed top-[-10%] left-[-20%] w-[320px] h-[320px] bg-purple-600/20 rounded-full blur-[110px] pointer-events-none" />
+      <div className="fixed bottom-[5%] right-[-20%] w-[320px] h-[320px] bg-pink-600/15 rounded-full blur-[110px] pointer-events-none" />
 
-      {/* En-tête invité */}
-      <header className="pt-6 relative z-10 text-center space-y-3">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] backdrop-blur-md">
+      {/* En-tête */}
+      <header className="pt-2 sm:pt-4 relative z-10 text-center space-y-2 shrink-0">
+        <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] backdrop-blur-md">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-[11px] uppercase tracking-widest text-slate-300 font-semibold">
+          <span className="text-[10px] uppercase tracking-widest text-slate-300 font-semibold">
             Direct soirée
           </span>
         </div>
 
-        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent px-4">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent px-2">
           {event?.title}
         </h1>
 
@@ -144,39 +141,34 @@ export default function GuestUploadPage({
         </p>
       </header>
 
-      {/* Zone centrale & Déclencheur Shutter */}
-      <div className="relative z-10 flex flex-col items-center justify-center my-auto py-6">
-        
-        {/* Toast Succès */}
+      {/* Zone centrale adaptative (portrait & paysage) */}
+      <div className="relative z-10 flex flex-col items-center justify-center my-4 sm:my-auto w-full">
         {uploadSuccess && (
-          <div className="mb-6 w-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-200 text-xs sm:text-sm font-medium p-4 rounded-2xl backdrop-blur-xl shadow-xl shadow-emerald-950/50 flex items-center justify-center gap-2 transition-all">
+          <div className="mb-4 w-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-200 text-xs sm:text-sm font-medium p-3 rounded-2xl backdrop-blur-xl shadow-xl flex items-center justify-center gap-2">
             <span>✨</span>
-            <span>Photo projetée sur l'écran ! Bravo !</span>
+            <span>Photo projetée sur l'écran !</span>
           </div>
         )}
 
-        {/* Toast Erreur */}
         {errorMessage && (
-          <div className="mb-6 w-full bg-red-950/80 border border-red-500/40 text-red-200 text-xs sm:text-sm p-4 rounded-2xl backdrop-blur-xl shadow-xl flex items-center justify-center gap-2">
+          <div className="mb-4 w-full bg-red-950/80 border border-red-500/40 text-red-200 text-xs sm:text-sm p-3 rounded-2xl backdrop-blur-xl shadow-xl flex items-center justify-center gap-2">
             <span>⚠️</span>
             <span>{errorMessage}</span>
           </div>
         )}
 
-        {/* Carte Déclencheur Photo */}
+        {/* Déclencheur responsive */}
         <label
-          className={`group relative flex flex-col items-center justify-center w-full aspect-[4/5] max-h-[380px] rounded-[32px] bg-white/[0.02] border border-white/10 hover:border-purple-500/30 backdrop-blur-2xl transition-all duration-300 shadow-2xl p-6 text-center cursor-pointer ${
+          className={`group relative flex flex-col landscape:flex-row items-center justify-center gap-4 landscape:gap-6 w-full py-8 landscape:py-5 px-6 rounded-3xl bg-white/[0.02] border border-white/10 hover:border-purple-500/30 backdrop-blur-2xl transition-all duration-300 shadow-2xl cursor-pointer ${
             uploading ? 'pointer-events-none opacity-80' : 'active:scale-[0.98]'
           }`}
         >
-          {/* Bouton Shutter façon objectif */}
-          <div className="relative mb-6">
+          <div className="relative shrink-0">
             <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-purple-600 to-pink-500 blur-xl opacity-40 group-hover:opacity-75 transition-opacity" />
-            
-            <div className="relative w-28 h-28 rounded-full border-4 border-white/20 p-1 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-              <div className="w-full h-full rounded-full bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-pink-500 flex items-center justify-center text-4xl shadow-inner">
+            <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white/20 p-1 flex items-center justify-center bg-black/40">
+              <div className="w-full h-full rounded-full bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-pink-500 flex items-center justify-center text-3xl sm:text-4xl shadow-inner">
                 {uploading ? (
-                  <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   '📸'
                 )}
@@ -184,11 +176,11 @@ export default function GuestUploadPage({
             </div>
           </div>
 
-          <div>
-            <p className="font-bold text-lg text-white group-hover:text-purple-300 transition-colors">
+          <div className="text-center landscape:text-left">
+            <p className="font-bold text-base sm:text-lg text-white group-hover:text-purple-300 transition-colors">
               {uploading ? 'Envoi vers le live...' : 'Prendre une photo'}
             </p>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-slate-400 mt-0.5">
               ou choisis dans ta galerie
             </p>
           </div>
@@ -204,9 +196,9 @@ export default function GuestUploadPage({
         </label>
       </div>
 
-      {/* Pied de page discret et premium */}
-      <footer className="relative z-10 pb-4 text-center">
-        <p className="text-[11px] text-slate-500 font-medium">
+      {/* Pied de page */}
+      <footer className="relative z-10 pt-2 pb-2 text-center shrink-0">
+        <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium">
           Propulsé par <span className="text-slate-400 font-bold tracking-wide">KlicEvent</span>
         </p>
       </footer>
