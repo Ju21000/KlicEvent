@@ -23,11 +23,14 @@ export default function SlideshowPage({
   const [loading, setLoading] = useState(true);
   const [guestUrl, setGuestUrl] = useState('');
 
+  // Détection stricte : la hauteur doit être nettement supérieure à la largeur
   const checkOrientation = (url: string): Promise<boolean> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.src = url;
-      img.onload = () => resolve(img.naturalHeight > img.naturalWidth);
+      img.onload = () => {
+        resolve(img.naturalHeight > img.naturalWidth * 1.05);
+      };
       img.onerror = () => resolve(false);
     });
   };
@@ -90,6 +93,7 @@ export default function SlideshowPage({
     fetchPhotos();
   }, [slug]);
 
+  // Défilement automatique
   useEffect(() => {
     if (photos.length <= 1) return;
 
@@ -97,6 +101,7 @@ export default function SlideshowPage({
       setCurrentIndex((prev) => {
         const current = photos[prev];
         const nextIdx = (prev + 1) % photos.length;
+        // Saute de 2 seulement si les deux photos formaient un duo portrait
         if (current?.isPortrait && photos[nextIdx]?.isPortrait && photos.length > 2) {
           return (prev + 2) % photos.length;
         }
@@ -105,7 +110,7 @@ export default function SlideshowPage({
     }, 7000);
 
     return () => clearInterval(interval);
-  }, [photos, currentIndex]);
+  }, [photos]);
 
   if (loading) {
     return (
@@ -117,19 +122,19 @@ export default function SlideshowPage({
 
   const currentPhoto = photos[currentIndex];
   const nextPhoto = photos[(currentIndex + 1) % photos.length];
-  const showDuo = currentPhoto?.isPortrait && nextPhoto?.isPortrait && photos.length > 1;
+  const showDuo = Boolean(currentPhoto?.isPortrait && nextPhoto?.isPortrait && photos.length > 1);
 
   return (
     <main className="relative w-screen h-screen bg-black overflow-hidden flex items-center justify-center select-none">
       {photos.length > 0 ? (
-        <div className="absolute inset-0 flex items-center justify-center pb-8">
+        <div className="absolute inset-0 flex items-center justify-center pb-8 px-8">
           {showDuo ? (
-            /* Duo portrait strictement symétrique et centré */
-            <div className="flex items-center justify-center gap-8 h-[80vh]">
+            /* Mode Duo : 2 vraies photos portraits strictement identiques et centrées */
+            <div className="flex items-center justify-center gap-8 h-[80vh] w-full max-w-6xl">
               {[currentPhoto, nextPhoto].map((photo, i) => (
                 <div
                   key={photo.id + i}
-                  className="h-full w-[45vh] max-w-[40vw] rounded-3xl overflow-hidden shadow-2xl border border-white/10 bg-zinc-950 flex items-center justify-center"
+                  className="h-full aspect-[9/16] max-w-[42vw] rounded-3xl overflow-hidden shadow-2xl border border-white/10 bg-zinc-950 flex items-center justify-center"
                 >
                   <img
                     src={photo.url}
@@ -140,7 +145,7 @@ export default function SlideshowPage({
               ))}
             </div>
           ) : (
-            /* Solo (paysage ou portrait seul) */
+            /* Mode Solo : paysage (ou portrait seul) pleine hauteur sans déformation */
             <div className="h-[80vh] max-w-[85vw] rounded-3xl overflow-hidden shadow-2xl border border-white/10 bg-zinc-950 flex items-center justify-center">
               <img
                 key={currentPhoto.id}
