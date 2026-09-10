@@ -1,12 +1,13 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
 
 interface Photo {
   id: string;
   url: string;
+  isPortrait?: boolean;
 }
 
 export default function SlideshowPage({
@@ -21,6 +22,16 @@ export default function SlideshowPage({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [guestUrl, setGuestUrl] = useState('');
+
+  // Détection de l'orientation d'une image
+  const checkOrientation = (url: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = url;
+      img.onload = () => resolve(img.naturalHeight > img.naturalWidth);
+      img.onerror = () => resolve(false);
+    });
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -43,10 +54,17 @@ export default function SlideshowPage({
         .order('created_at', { ascending: false });
 
       if (photosData) {
-        setPhotos(photosData);
+        const photosWithOrientation = await Promise.all(
+          photosData.map(async (p) => ({
+            ...p,
+            isPortrait: await checkOrientation(p.url),
+          }))
+        );
+        setPhotos(photosWithOrientation);
       }
       setLoading(false);
 
+      // Écoute des nouvelles photos en direct
       const channel = supabase
         .channel(`slideshow-${eventData.id}`)
         .on(
@@ -57,8 +75,10 @@ export default function SlideshowPage({
             table: 'photos',
             filter: `event_id=eq.${eventData.id}`,
           },
-          (payload) => {
-            setPhotos((prev) => [payload.new as Photo, ...prev]);
+          async (payload) => {
+            const newPhoto = payload.new as Photo;
+            const isPortrait = await checkOrientation(newPhoto.url);
+            setPhotos((prev) => [{ ...newPhoto, isPortrait }, ...prev]);
             setCurrentIndex(0);
           }
         )
@@ -72,15 +92,24 @@ export default function SlideshowPage({
     fetchPhotos();
   }, [slug]);
 
+  // Défilement automatique
   useEffect(() => {
     if (photos.length <= 1) return;
 
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % photos.length);
-    }, 6000);
+      setCurrentIndex((prev) => {
+        const current = photos[prev];
+        // Si on affichait un duo de portraits, on avance de 2 crans si possible
+        const nextIdx = (prev + 1) % photos.length;
+        if (current?.isPortrait && photos[nextIdx]?.isPortrait && photos.length > 2) {
+          return (prev + 2) % photos.length;
+        }
+        return nextIdx;
+      });
+    }, 7000);
 
     return () => clearInterval(interval);
-  }, [photos.length]);
+  }, [photos, currentIndex]);
 
   if (loading) {
     return (
@@ -90,31 +119,42 @@ export default function SlideshowPage({
     );
   }
 
+  const currentPhoto = photos[currentIndex];
+  const nextPhoto = photos[(currentIndex + 1) % photos.length];
+  const showDuo = currentPhoto?.isPortrait && nextPhoto?.isPortrait && photos.length > 1;
+
   return (
     <main className="relative w-screen h-screen bg-black overflow-hidden flex items-center justify-center select-none">
-      {/* Diaporama avec fondu, zoom doux et bords arrondis */}
       {photos.length > 0 ? (
-        photos.map((photo, index) => {
-          const isActive = index === currentIndex;
-          return (
-            <div
-              key={photo.id}
-              className={`absolute inset-0 flex items-center justify-center p-6 sm:p-10 transition-opacity duration-1000 ease-in-out ${
-                isActive ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
-              }`}
-            >
-              <div className="relative max-w-full max-h-full rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center bg-black/40">
-                <img
-                  src={photo.url}
-                  alt="Photo live"
-                  className={`max-w-full max-h-[85vh] object-contain rounded-3xl transition-transform duration-[6000ms] ease-out ${
-                    isActive ? 'scale-105' : 'scale-100'
-                  }`}
-                />
-              </div>
+        <div className="absolute inset-0 flex items-center justify-center p-6 sm:p-10 transition-opacity duration-1000 ease-in-out">
+          {showDuo ? (
+            /* Mode Duo pour 2 photos portrait côte à côte */
+            <div className="flex items-center justify-center gap-6 md:gap-10 w-full h-full max-h-[85vh]">
+              {[currentPhoto, nextPhoto].map((photo, i) => (
+                <div
+                  key={photo.id + i}
+                  className="relative h-full max-w-[48%] rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center bg-black/40"
+                >
+                  <img
+                    src={photo.url}
+                    alt="Photo live"
+                    className="max-w-full max-h-full object-contain rounded-3xl transition-transform duration-[7000ms] ease-out scale-105"
+                  />
+                </div>
+              ))}
             </div>
-          );
-        })
+          ) : (
+            /* Mode Solo (paysage ou portrait isolé) */
+            <div className="relative max-w-full max-h-full rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center bg-black/40">
+              <img
+                key={currentPhoto.id}
+                src={currentPhoto.url}
+                alt="Photo live"
+                className="max-w-full max-h-[85vh] object-contain rounded-3xl transition-transform duration-[7000ms] ease-out scale-105"
+              />
+            </div>
+          )}
+        </div>
       ) : (
         <div className="text-center text-slate-400 z-10">
           <p className="text-lg font-medium">En attente de la première photo...</p>
