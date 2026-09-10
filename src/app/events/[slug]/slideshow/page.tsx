@@ -92,24 +92,26 @@ export default function SlideshowPage({
 
   return (
     <main className="relative w-screen h-screen bg-black overflow-hidden flex items-center justify-center select-none">
-      {/* Diaporama avec fondu et zoom doux */}
+      {/* Diaporama avec fondu, zoom doux et bords arrondis */}
       {photos.length > 0 ? (
         photos.map((photo, index) => {
           const isActive = index === currentIndex;
           return (
             <div
               key={photo.id}
-              className={`absolute inset-0 flex items-center justify-center transition-opacity duration-1000 ease-in-out ${
+              className={`absolute inset-0 flex items-center justify-center p-6 sm:p-10 transition-opacity duration-1000 ease-in-out ${
                 isActive ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
               }`}
             >
-              <img
-                src={photo.url}
-                alt="Photo live"
-                className={`max-w-full max-h-full object-contain transition-transform duration-[6000ms] ease-out ${
-                  isActive ? 'scale-105' : 'scale-100'
-                }`}
-              />
+              <div className="relative max-w-full max-h-full rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center bg-black/40">
+                <img
+                  src={photo.url}
+                  alt="Photo live"
+                  className={`max-w-full max-h-[85vh] object-contain rounded-3xl transition-transform duration-[6000ms] ease-out ${
+                    isActive ? 'scale-105' : 'scale-100'
+                  }`}
+                />
+              </div>
             </div>
           );
         })
