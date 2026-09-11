@@ -15,11 +15,16 @@ function DashboardContent() {
   const [user, setUser] = useState<any>(null);
   const [authStatus, setAuthStatus] = useState<string>('Vérification...');
 
+  // État pour la modale de suppression de compte
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [confirmInput, setConfirmInput] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
   useEffect(() => {
     let isMounted = true;
 
     async function loadDashboardData() {
-      // 1. Vérification de la session Supabase
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -29,7 +34,6 @@ function DashboardContent() {
         setUser(session.user);
         setAuthStatus(`Connecté en tant que : ${session.user.email}`);
 
-        // Chargement de tous les événements du compte
         const { data, error } = await supabase
           .from('events')
           .select('*')
@@ -40,7 +44,6 @@ function DashboardContent() {
           setEvents(data);
         }
       } else if (eventIdFromUrl) {
-        // 2. Accès direct post-paiement via ?eventId=...
         if (!isMounted) return;
         setAuthStatus('Accès invité via session d’achat');
 
@@ -65,7 +68,6 @@ function DashboardContent() {
 
     loadDashboardData();
 
-    // Écoute dynamique de la session
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -94,6 +96,48 @@ function DashboardContent() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (confirmInput.trim().toUpperCase() !== 'SUPPRIMER') {
+      setDeleteError('Veuillez taper "SUPPRIMER" en toutes lettres.');
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    setDeleteError('');
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error('Session expirée. Reconnectez-vous.');
+      }
+
+      const res = await fetch('/api/delete-account', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.error || 'Erreur lors de la suppression.');
+      }
+
+      // Déconnexion et redirection vers l'accueil
+      await supabase.auth.signOut();
+      alert('Votre compte et l’ensemble de vos données ont été définitivement supprimés.');
+      window.location.href = '/';
+    } catch (err: any) {
+      console.error(err);
+      setDeleteError(err.message || 'Une erreur est survenue.');
+      setIsDeletingAccount(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-slate-950 text-white p-6 md:p-12">
       <div className="max-w-4xl mx-auto space-y-8">
@@ -101,7 +145,7 @@ function DashboardContent() {
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center text-xs">
           <span className="text-purple-400 font-medium">Statut auth : {authStatus}</span>
           {user && (
-            <button onClick={handleLogout} className="text-red-400 hover:underline">
+            <button onClick={handleLogout} className="text-red-400 hover:underline cursor-pointer">
               Se déconnecter
             </button>
           )}
@@ -124,7 +168,10 @@ function DashboardContent() {
         ) : !user && !eventIdFromUrl ? (
           <div className="text-center py-12 bg-red-950/20 border border-red-900/50 rounded-2xl space-y-4">
             <p className="text-red-300 font-semibold">Tu n'es pas connecté.</p>
-            <Link href="/login" className="inline-block px-6 py-2 bg-slate-800 rounded-xl text-sm hover:bg-slate-700">
+            <Link
+              href="/login"
+              className="inline-block px-6 py-2 bg-slate-800 rounded-xl text-sm hover:bg-slate-700"
+            >
               Se connecter
             </Link>
           </div>
@@ -209,7 +256,92 @@ function DashboardContent() {
             })}
           </div>
         )}
+
+        {/* Zone de Danger : Suppression du compte */}
+        {user && (
+          <div className="pt-10 border-t border-slate-800/80">
+            <div className="bg-red-950/20 border border-red-900/40 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-bold text-red-400">Zone de danger</h3>
+                <p className="text-xs text-slate-400 mt-1 max-w-xl leading-relaxed">
+                  La suppression de votre compte efface définitivement tous vos événements, QR codes et photos associées stockées dans nos bases. Cette action est irréversible.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setConfirmInput('');
+                  setDeleteError('');
+                  setShowDeleteModal(true);
+                }}
+                className="px-4 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-300 border border-red-500/30 rounded-xl text-xs font-semibold transition shrink-0 cursor-pointer"
+              >
+                Supprimer mon compte
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Modale de confirmation de suppression */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-red-500/30 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-5 shadow-2xl">
+            <div className="w-12 h-12 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center text-2xl mx-auto">
+              ⚠️
+            </div>
+
+            <div className="text-center space-y-2">
+              <h2 className="text-xl font-bold text-white">Supprimer définitivement votre compte ?</h2>
+              <p className="text-xs text-amber-300/90 font-medium bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl">
+                📸 <strong>Attention :</strong> pensez à bien télécharger toutes les photos de vos événements avant de confirmer. Une fois le compte supprimé, aucun souvenir ne pourra être restauré.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs text-slate-400 block text-center">
+                Pour confirmer, tapez le mot <strong className="text-white">SUPPRIMER</strong> ci-dessous :
+              </label>
+              <input
+                type="text"
+                value={confirmInput}
+                onChange={(e) => setConfirmInput(e.target.value)}
+                placeholder="SUPPRIMER"
+                className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-center text-sm font-semibold text-white focus:outline-none focus:border-red-500 uppercase tracking-wider"
+              />
+            </div>
+
+            {deleteError && (
+              <p className="text-xs text-red-400 text-center font-medium">{deleteError}</p>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeletingAccount}
+                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold text-slate-300 transition cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={isDeletingAccount || confirmInput.trim().toUpperCase() !== 'SUPPRIMER'}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:pointer-events-none rounded-xl text-xs font-bold text-white transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {isDeletingAccount ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Suppression...</span>
+                  </>
+                ) : (
+                  'Confirmer'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
