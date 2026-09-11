@@ -10,7 +10,7 @@ function SuccessCard() {
   const searchParams = useSearchParams();
   const eventId = searchParams.get('eventId');
 
-  const [event, setEvent] = useState<{ title: string; slug: string } | null>(null);
+  const [event, setEvent] = useState<{ id: string; title: string; slug: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,7 +22,7 @@ function SuccessCard() {
         colors: ['#a855f7', '#ec4899', '#3b82f6', '#10b981'],
       });
     } catch {
-      // Évite tout crash si confetti n'est pas prêt
+      // Pas de blocage si confetti échoue
     }
 
     async function loadEvent() {
@@ -33,7 +33,7 @@ function SuccessCard() {
 
       const { data } = await supabase
         .from('events')
-        .select('title, slug')
+        .select('id, title, slug')
         .eq('id', eventId)
         .single();
 
@@ -75,35 +75,41 @@ function SuccessCard() {
       </h1>
 
       <p className="text-xs sm:text-sm text-slate-400 mb-6 max-w-xs leading-relaxed">
-        Ton live photo est configuré. Tu peux dès maintenant lancer le diaporama sur grand écran ou partager le lien avec tes invités.
+        Ton événement est en ligne. Gère tes paramètres depuis le tableau de bord ou lance l'animation.
       </p>
 
-      {slug ? (
-        <div className="w-full flex flex-col gap-3">
-          <Link
-            href={`/events/${slug}/slideshow`}
-            target="_blank"
-            className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-sm shadow-xl transition-all active:scale-[0.98]"
-          >
-            Lancer le Diaporama Plein Écran 📺
-          </Link>
-
-          <Link
-            href={`/events/${slug}`}
-            target="_blank"
-            className="w-full py-3.5 px-5 rounded-2xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-slate-200 font-medium text-sm transition-all active:scale-[0.98]"
-          >
-            Tester la page Invités 📸
-          </Link>
-        </div>
-      ) : (
+      {/* Les 3 boutons d'accès */}
+      <div className="w-full flex flex-col gap-3">
         <Link
-          href="/"
-          className="w-full py-3.5 px-5 rounded-2xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-slate-200 font-medium text-sm transition-all"
+          href={eventId ? `/dashboard?eventId=${eventId}` : '/dashboard'}
+          className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-sm shadow-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
         >
-          Retour à l'accueil
+          <span>Accéder au Dashboard</span>
+          <span>📊</span>
         </Link>
-      )}
+
+        {slug && (
+          <>
+            <Link
+              href={`/events/${slug}/slideshow`}
+              target="_blank"
+              className="w-full py-3.5 px-5 rounded-2xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 text-white font-semibold text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              <span>Lancer le Diaporama Plein Écran</span>
+              <span>📺</span>
+            </Link>
+
+            <Link
+              href={`/events/${slug}`}
+              target="_blank"
+              className="w-full py-3 px-5 rounded-2xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/10 text-slate-300 font-medium text-xs transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              <span>Tester la page Invités</span>
+              <span>📸</span>
+            </Link>
+          </>
+        )}
+      </div>
 
       <p className="text-[10px] text-slate-500 font-medium mt-6">
         Propulsé par <span className="text-slate-400 font-semibold">KlicEvent</span>
