@@ -1,50 +1,85 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
-export default function DashboardPage() {
+function DashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const eventIdFromUrl = searchParams.get('eventId');
+
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [authStatus, setAuthStatus] = useState<string>('Vérification...');
 
   useEffect(() => {
-    const fetchUserDataAndEvents = async () => {
+    let isMounted = true;
+
+    async function loadDashboardData() {
+      // 1. Vérification de la session Supabase
       const {
         data: { session },
-        error: sessionError,
       } = await supabase.auth.getSession();
 
-      if (sessionError || !session) {
-        setAuthStatus('Aucune session active détectée.');
-        setLoading(false);
-        return;
-      }
+      if (session?.user) {
+        if (!isMounted) return;
+        setUser(session.user);
+        setAuthStatus(`Connecté en tant que : ${session.user.email}`);
 
-      const currentUser = session.user;
-      setUser(currentUser);
-      setAuthStatus(`Connecté en tant que : ${currentUser.email}`);
+        // Chargement de tous les événements du compte
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: false });
 
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('created_at', { ascending: false });
+        if (!error && data && isMounted) {
+          setEvents(data);
+        }
+      } else if (eventIdFromUrl) {
+        // 2. Accès direct post-paiement via ?eventId=...
+        if (!isMounted) return;
+        setAuthStatus('Accès invité via session d’achat');
 
-      if (error) {
-        console.error('Erreur de récupération des événements :', error);
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .eq('id', eventIdFromUrl)
+          .single();
+
+        if (!error && data && isMounted) {
+          setEvents([data]);
+        }
       } else {
-        setEvents(data || []);
+        if (!isMounted) return;
+        setAuthStatus('Aucune session active détectée.');
       }
-      setLoading(false);
-    };
 
-    fetchUserDataAndEvents();
-  }, []);
+      if (isMounted) {
+        setLoading(false);
+      }
+    }
+
+    loadDashboardData();
+
+    // Écoute dynamique de la session
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        setAuthStatus(`Connecté en tant que : ${session.user.email}`);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [eventIdFromUrl]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -55,19 +90,21 @@ export default function DashboardPage() {
     if (!confirm('Supprimer cet événement ?')) return;
     const { error } = await supabase.from('events').delete().eq('id', eventId);
     if (!error) {
-      setEvents(events.filter((evt: any) => evt.id !== eventId));
+      setEvents((prev) => prev.filter((evt) => evt.id !== eventId));
     }
   };
 
   return (
     <main className="min-h-screen bg-slate-950 text-white p-6 md:p-12">
       <div className="max-w-4xl mx-auto space-y-8">
-        {/* En-tête de diagnostic temporaire */}
+        {/* En-tête statut */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center text-xs">
           <span className="text-purple-400 font-medium">Statut auth : {authStatus}</span>
-          <button onClick={handleLogout} className="text-red-400 hover:underline">
-            Se déconnecter
-          </button>
+          {user && (
+            <button onClick={handleLogout} className="text-red-400 hover:underline">
+              Se déconnecter
+            </button>
+          )}
         </div>
 
         <div className="flex justify-between items-center border-b border-slate-800 pb-6">
@@ -84,11 +121,11 @@ export default function DashboardPage() {
 
         {loading ? (
           <p className="text-slate-500 text-center py-12">Chargement de vos événements...</p>
-        ) : !user ? (
+        ) : !user && !eventIdFromUrl ? (
           <div className="text-center py-12 bg-red-950/20 border border-red-900/50 rounded-2xl space-y-4">
             <p className="text-red-300 font-semibold">Tu n'es pas connecté.</p>
-            <Link href="/" className="inline-block px-6 py-2 bg-slate-800 rounded-xl text-sm">
-              Retourner à l'accueil pour te connecter
+            <Link href="/login" className="inline-block px-6 py-2 bg-slate-800 rounded-xl text-sm hover:bg-slate-700">
+              Se connecter
             </Link>
           </div>
         ) : events.length === 0 ? (
@@ -96,7 +133,7 @@ export default function DashboardPage() {
             <p className="text-slate-400">Aucun événement pour le moment.</p>
             <Link
               href="/create-event"
-              className="inline-block px-6 py-3 bg-purple-600 rounded-xl font-semibold"
+              className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-500 rounded-xl font-semibold"
             >
               Créer mon premier événement 🚀
             </Link>
@@ -104,7 +141,7 @@ export default function DashboardPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {events.map((evt: any) => {
-              const eventUrl = `https://www.KlicEvent.com/events/${evt.slug}`;
+              const eventUrl = `https://www.klicevent.com/events/${evt.slug}`;
               const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
                 eventUrl
               )}`;
@@ -133,7 +170,7 @@ export default function DashboardPage() {
                     <div className="text-xs space-y-1">
                       <p className="text-purple-400 font-semibold">QR Code Invités</p>
                       <p className="text-slate-400 truncate max-w-[170px]">
-                        www.KlicEvent.com/events/{evt.slug}
+                        www.klicevent.com/events/{evt.slug}
                       </p>
                       <a
                         href={qrCodeUrl}
@@ -174,5 +211,19 @@ export default function DashboardPage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+          <p className="text-slate-500 text-sm">Chargement du tableau de bord...</p>
+        </main>
+      }
+    >
+      <DashboardContent />
+    </Suspense>
   );
 }
