@@ -27,10 +27,11 @@ export async function POST(req: Request) {
     const host = req.headers.get('host') || 'klicevent.com';
     const origin = `${protocol}://${host}`;
 
-    // Création de la session de paiement Stripe
+    // Création de la session de paiement Stripe avec support des codes promo
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       customer_email: email || undefined,
+      allow_promotion_codes: true, // Active le champ code promo (ex: VIP100) sur Stripe
       line_items: [
         {
           price_data: {
@@ -56,6 +57,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: session.url });
   } catch (error: any) {
     console.error('Erreur Stripe Checkout:', error);
-    return NextResponse.json({ error: error.message || 'Erreur interne du serveur' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Erreur interne du serveur' },
+      { status: 500 }
+    );
   }
 }
