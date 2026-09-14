@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 
@@ -12,6 +12,15 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+// Configuration du Viewport pour la PWA et l'affichage mobile
+export const viewport: Viewport = {
+  themeColor: '#07050f',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.klicevent.com'),
   title: {
@@ -21,6 +30,15 @@ export const metadata: Metadata = {
   description:
     'Transformez les smartphones de vos invités en photobooth instantané. Diaporama live en direct sur grand écran sans application à installer.',
   applicationName: 'KlicEvent',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'KlicEvent',
+  },
+  icons: {
+    apple: '/icon-192.png',
+  },
   keywords: [
     'photobooth',
     'diaporama live',
