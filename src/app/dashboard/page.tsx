@@ -244,6 +244,13 @@ function DashboardContent() {
                     >
                       Live 📺
                     </Link>
+                    <Link
+                      href={`/dashboard/${evt.id}/print`}
+                      target="_blank"
+                      className="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg border border-slate-700 transition"
+                    >
+                      🖨️ Fiches
+                    </Link>
                     <button
                       onClick={() => handleDeleteEvent(evt.id)}
                       className="px-3 py-2 bg-red-950/40 hover:bg-red-900/60 text-red-400 text-xs rounded-lg border border-red-900/50 transition cursor-pointer"
