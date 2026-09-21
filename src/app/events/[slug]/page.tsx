@@ -72,7 +72,7 @@ export default function GuestUploadPage({
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const fileExt = file.name.split('.').pop();
+        const fileExt = file.name.split('.').pop() || 'jpg';
         const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
         const filePath = `${event.id}/${fileName}`;
 
@@ -159,7 +159,7 @@ export default function GuestUploadPage({
           </div>
         )}
 
-        {/* Déclencheur Photo unifié */}
+        {/* Déclencheur Photo */}
         <label
           className={`group w-full flex flex-col landscape:flex-row items-center justify-center gap-4 landscape:gap-6 p-5 sm:p-6 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-purple-500/40 hover:bg-white/[0.05] active:scale-[0.98] transition-all duration-200 cursor-pointer ${
             uploading ? 'pointer-events-none opacity-80' : ''
@@ -192,14 +192,14 @@ export default function GuestUploadPage({
           <input
             type="file"
             accept="image/*"
-            capture="environment"
+            multiple
             onChange={handleFileUpload}
             disabled={uploading}
             className="hidden"
           />
         </label>
 
-        {/* Footer intégré à la carte */}
+        {/* Footer */}
         <p className="text-[10px] text-slate-500 font-medium mt-6">
           Propulsé par <span className="text-slate-400 font-semibold tracking-wide">KlicEvent</span>
         </p>
