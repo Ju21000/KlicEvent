@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import confetti from 'canvas-confetti';
@@ -19,6 +19,9 @@ export default function GuestUploadPage({
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const router = useRouter();
+
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function fetchEvent() {
@@ -102,7 +105,8 @@ export default function GuestUploadPage({
       setErrorMessage("Impossible d'envoyer la photo. Réessaie dans un instant.");
     } finally {
       setUploading(false);
-      e.target.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
     }
   };
 
@@ -119,11 +123,10 @@ export default function GuestUploadPage({
 
   return (
     <main className="min-h-screen w-full bg-[#07050f] text-white flex items-center justify-center p-4 sm:p-6 overflow-y-auto selection:bg-purple-600">
-      {/* Halos d'ambiance en arrière-plan */}
+      {/* Halos d'ambiance */}
       <div className="fixed top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[380px] h-[380px] bg-purple-600/15 rounded-full blur-[120px] pointer-events-none" />
       <div className="fixed bottom-10 left-1/2 -translate-x-1/2 w-[340px] h-[340px] bg-pink-600/10 rounded-full blur-[120px] pointer-events-none" />
 
-      {/* Carte unifiée et responsive */}
       <div className="relative z-10 w-full max-w-sm landscape:max-w-xl bg-white/[0.03] border border-white/10 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 flex flex-col items-center shadow-2xl transition-all duration-300">
         
         {/* Badge d'état */}
@@ -159,45 +162,74 @@ export default function GuestUploadPage({
           </div>
         )}
 
-        {/* Déclencheur Photo */}
-        <label
-          className={`group w-full flex flex-col landscape:flex-row items-center justify-center gap-4 landscape:gap-6 p-5 sm:p-6 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-purple-500/40 hover:bg-white/[0.05] active:scale-[0.98] transition-all duration-200 cursor-pointer ${
-            uploading ? 'pointer-events-none opacity-80' : ''
-          }`}
-        >
-          {/* Cercle avec icône appareil photo */}
-          <div className="relative shrink-0">
-            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-purple-600 to-pink-500 blur-md opacity-50 group-hover:opacity-80 transition-opacity" />
-            <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-white/20 p-1 flex items-center justify-center bg-black/40">
-              <div className="w-full h-full rounded-full bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-pink-500 flex items-center justify-center text-2xl sm:text-3xl shadow-inner">
+        {/* Inputs cachés */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileUpload}
+          disabled={uploading}
+          className="hidden"
+          id="event-camera-input"
+        />
+        <input
+          ref={galleryInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleFileUpload}
+          disabled={uploading}
+          className="hidden"
+          id="event-gallery-input"
+        />
+
+        {/* 2 boutons dédiés */}
+        <div className="w-full flex flex-col gap-3">
+          {/* Bouton 1 : Prendre une photo */}
+          <label
+            htmlFor="event-camera-input"
+            className={`group w-full flex items-center justify-center gap-4 p-4 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-purple-500/50 hover:bg-white/[0.07] active:scale-[0.98] transition-all duration-200 cursor-pointer ${
+              uploading ? 'pointer-events-none opacity-60' : ''
+            }`}
+          >
+            <div className="relative shrink-0">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center text-xl shadow-md">
                 {uploading ? (
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   '📸'
                 )}
               </div>
             </div>
-          </div>
+            <div className="text-left flex-1">
+              <p className="font-bold text-sm sm:text-base text-white group-hover:text-purple-300 transition-colors">
+                Prendre une photo
+              </p>
+              <p className="text-[11px] text-slate-400">Ouvre l'appareil photo en direct</p>
+            </div>
+          </label>
 
-          {/* Intitulé du bouton */}
-          <div className="text-center landscape:text-left">
-            <p className="font-bold text-base sm:text-lg text-white group-hover:text-purple-300 transition-colors leading-snug">
-              {uploading ? 'Envoi en cours...' : 'Prendre une photo'}
-            </p>
-            <p className="text-xs text-slate-400 mt-0.5">
-              ou choisis dans ta galerie
-            </p>
-          </div>
-
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handleFileUpload}
-            disabled={uploading}
-            className="hidden"
-          />
-        </label>
+          {/* Bouton 2 : Galerie */}
+          <label
+            htmlFor="event-gallery-input"
+            className={`group w-full flex items-center justify-center gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-pink-500/50 hover:bg-white/[0.05] active:scale-[0.98] transition-all duration-200 cursor-pointer ${
+              uploading ? 'pointer-events-none opacity-60' : ''
+            }`}
+          >
+            <div className="relative shrink-0">
+              <div className="w-12 h-12 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-xl group-hover:border-pink-500/40 transition-colors">
+                🖼️
+              </div>
+            </div>
+            <div className="text-left flex-1">
+              <p className="font-bold text-sm sm:text-base text-white group-hover:text-pink-300 transition-colors">
+                Choisir dans ma galerie
+              </p>
+              <p className="text-[11px] text-slate-400">Sélection multiple de photos</p>
+            </div>
+          </label>
+        </div>
 
         {/* Footer */}
         <p className="text-[10px] text-slate-500 font-medium mt-6">
