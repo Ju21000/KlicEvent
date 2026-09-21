@@ -120,13 +120,14 @@ function UploadContent() {
           )}
 
           <div>
+            {/* Input avec accept="image/*" sans l'attribut capture pour afficher le choix natif Caméra / Galerie */}
             <input
               ref={fileInputRef}
               id="photos"
               name="photos"
               type="file"
               multiple
-              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+              accept="image/*"
               onChange={handleFileChange}
               className="hidden"
               disabled={uploading || !eventParam}
@@ -148,7 +149,7 @@ function UploadContent() {
               <span className="text-xs text-slate-500 mt-1">
                 {selectedCount > 0
                   ? `${selectedCount} photo${selectedCount > 1 ? 's sélectionnées' : ' sélectionnée'}`
-                  : 'Formats photos uniquement (JPEG, PNG, HEIC)'}
+                  : 'Sélection multiple autorisée'}
               </span>
             </label>
           </div>
