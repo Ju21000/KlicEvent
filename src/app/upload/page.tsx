@@ -1,206 +1,225 @@
 'use client';
 
-import { useState, Suspense, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, Suspense, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import confetti from 'canvas-confetti';
 
 function UploadContent() {
   const searchParams = useSearchParams();
   const eventParam = searchParams.get('event');
+  const router = useRouter();
 
+  const [event, setEvent] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
+  // Récupération éventuelle des infos de l'événement pour vérifier max_photos
+  useEffect(() => {
+    async function loadEventData() {
+      if (!eventParam) return;
+      const { data } = await supabase
+        .from('events')
+        .select('id, title, max_photos')
+        .eq('slug', eventParam)
+        .single();
 
-  // Gestion de la sélection (cumule ou remplace les fichiers choisis)
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const newFiles = Array.from(e.target.files).filter(file => file.type.startsWith('image/'));
-      setSelectedFiles(prev => [...prev, ...newFiles]);
+      if (data) {
+        setEvent(data);
+      }
     }
+    loadEventData();
+  }, [eventParam]);
+
+  const triggerCelebration = () => {
+    confetti({
+      particleCount: 80,
+      spread: 70,
+      origin: { y: 0.7 },
+      colors: ['#a855f7', '#ec4899', '#3b82f6', '#fbbf24'],
+      disableForReducedMotion: true,
+    });
   };
 
-  const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!eventParam || selectedFiles.length === 0) return;
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !eventParam) return;
 
     setUploading(true);
-    setError('');
+    setUploadSuccess(false);
+    setErrorMessage('');
 
     try {
-      for (let i = 0; i < selectedFiles.length; i++) {
-        const file = selectedFiles[i];
+      // 1. Vérification quota max_photos si présent
+      if (event?.id && event?.max_photos) {
+        const { count, error: countError } = await supabase
+          .from('photos')
+          .select('*', { count: 'exact', head: true })
+          .eq('event_id', event.id);
+
+        if (!countError && count !== null && count >= event.max_photos) {
+          setErrorMessage('La boîte à souvenirs est complète pour cet événement !');
+          setUploading(false);
+          return;
+        }
+      }
+
+      // 2. Upload des fichiers
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         const fileExt = file.name.split('.').pop() || 'jpg';
         const fileName = `${eventParam}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
-        // 1. Upload dans le bucket Supabase Storage
         const { error: storageError } = await supabase.storage
           .from('event-photos')
           .upload(fileName, file);
 
-        if (storageError) {
-          console.error("Erreur Storage :", storageError);
-          throw storageError;
-        }
+        if (storageError) throw storageError;
 
-        // 2. Récupération de l'URL publique
         const { data: publicUrlData } = supabase.storage
           .from('event-photos')
           .getPublicUrl(fileName);
 
-        const photoUrl = publicUrlData.publicUrl;
+        const photoPayload: any = {
+          event_slug: eventParam,
+          url: publicUrlData.publicUrl,
+        };
 
-        // 3. Insertion en base de données
+        if (event?.id) {
+          photoPayload.event_id = event.id;
+        }
+
         const { error: dbError } = await supabase
           .from('photos')
-          .insert([{ event_slug: eventParam, url: photoUrl }]);
+          .insert([photoPayload]);
 
-        if (dbError) {
-          console.error("Erreur DB Insert :", dbError);
-          throw new Error(`Erreur Base de données : ${dbError.message}`);
-        }
+        if (dbError) throw dbError;
       }
 
-      setSuccess(true);
-      setSelectedFiles([]);
-      if (cameraInputRef.current) cameraInputRef.current.value = '';
-      if (galleryInputRef.current) galleryInputRef.current.value = '';
+      setUploadSuccess(true);
+      triggerCelebration();
+      setTimeout(() => setUploadSuccess(false), 5000);
     } catch (err: any) {
-      setError(err.message || 'Erreur lors du téléversement des photos.');
+      console.error("Erreur d'envoi :", err);
+      setErrorMessage(err.message || "Impossible d'envoyer la photo. Réessaie dans un instant.");
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   };
 
   return (
-    <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-purple-400">Ajouter des photos 📸</h1>
-        {eventParam && (
-          <Link href={`/events/${eventParam}`} className="text-xs text-slate-400 hover:text-white">
-            ← Retour
-          </Link>
+    <main className="min-h-screen w-full bg-[#07050f] text-white flex items-center justify-center p-4 sm:p-6 overflow-y-auto selection:bg-purple-600">
+      {/* Halos d'ambiance néon */}
+      <div className="fixed top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[380px] h-[380px] bg-purple-600/15 rounded-full blur-[120px] pointer-events-none" />
+      <div className="fixed bottom-10 left-1/2 -translate-x-1/2 w-[340px] h-[340px] bg-pink-600/10 rounded-full blur-[120px] pointer-events-none" />
+
+      {/* Carte en verre dépoli */}
+      <div className="relative z-10 w-full max-w-sm landscape:max-w-xl bg-white/[0.03] border border-white/10 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 flex flex-col items-center shadow-2xl transition-all duration-300">
+        
+        {/* Badge d'état */}
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/10 mb-4">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-[10px] uppercase tracking-widest text-slate-300 font-bold">
+            Direct soirée
+          </span>
+        </div>
+
+        {/* Titre de la page */}
+        <div className="text-center space-y-1.5 mb-6">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
+            {event?.title || (eventParam ? `#${eventParam}` : 'Ajouter une photo')}
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-400 max-w-xs mx-auto leading-relaxed">
+            Capture l'instant : ta photo apparaît directement sur le grand écran.
+          </p>
+        </div>
+
+        {/* Alerte si pas d'événement dans l'URL */}
+        {!eventParam && (
+          <div className="mb-5 w-full bg-amber-950/80 border border-amber-500/40 text-amber-200 text-xs p-3 rounded-2xl backdrop-blur-xl shadow-lg text-center">
+            Aucun événement spécifié. Veuillez scanner le QR code de votre table.
+          </div>
         )}
-      </div>
 
-      {error && (
-        <div className="bg-red-500/10 border border-red-500 text-red-400 p-3 rounded-lg text-sm">
-          {error}
-        </div>
-      )}
+        {/* Notification Succès */}
+        {uploadSuccess && (
+          <div className="mb-5 w-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-200 text-xs font-medium p-3 rounded-2xl backdrop-blur-xl shadow-lg flex items-center justify-center gap-2 animate-bounce">
+            <span>✨</span>
+            <span>Photo projetée sur l'écran !</span>
+          </div>
+        )}
 
-      {success ? (
-        <div className="bg-green-500/10 border border-green-500 text-green-400 p-4 rounded-xl text-center space-y-3">
-          <p className="font-semibold">Photos envoyées avec succès ! 🎉</p>
-          <button
-            onClick={() => setSuccess(false)}
-            className="px-4 py-2 bg-slate-800 text-white text-sm rounded-lg hover:bg-slate-700 cursor-pointer transition"
-          >
-            Ajouter d'autres photos
-          </button>
-        </div>
-      ) : (
-        <form onSubmit={handleUpload} className="space-y-5">
-          {eventParam ? (
-            <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-slate-300">
-              Événement cible : <span className="text-purple-400 font-semibold">#{eventParam}</span>
-            </div>
-          ) : (
-            <div className="bg-red-500/10 border border-red-500 text-red-400 p-3 rounded-lg text-sm">
-              Aucun événement sélectionné. Veuillez passer par le lien de votre galerie.
-            </div>
-          )}
+        {/* Notification Erreur */}
+        {errorMessage && (
+          <div className="mb-5 w-full bg-red-950/80 border border-red-500/40 text-red-200 text-xs p-3 rounded-2xl backdrop-blur-xl shadow-lg flex items-center justify-center gap-2">
+            <span>⚠️</span>
+            <span>{errorMessage}</span>
+          </div>
+        )}
 
-          {/* Deux inputs invisibles spécialisés */}
-          <input
-            ref={cameraInputRef}
-            id="camera-upload"
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFileChange}
-            className="hidden"
-            disabled={uploading || !eventParam}
-          />
-          <input
-            ref={galleryInputRef}
-            id="gallery-upload"
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handleFileChange}
-            className="hidden"
-            disabled={uploading || !eventParam}
-          />
-
-          {/* Les 2 boutons d'action mobile */}
-          <div className="grid grid-cols-2 gap-3">
-            <label
-              htmlFor="camera-upload"
-              className="flex flex-col items-center justify-center p-4 bg-slate-950 border border-slate-800 hover:border-purple-500 rounded-xl cursor-pointer transition text-center group active:scale-95"
-            >
-              <div className="w-10 h-10 mb-2 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
+        {/* Déclencheur Photo / Galerie interactif */}
+        <label
+          className={`group w-full flex flex-col landscape:flex-row items-center justify-center gap-4 landscape:gap-6 p-5 sm:p-6 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-purple-500/40 hover:bg-white/[0.05] active:scale-[0.98] transition-all duration-200 cursor-pointer ${
+            uploading || !eventParam ? 'pointer-events-none opacity-60' : ''
+          }`}
+        >
+          {/* Cercle dégradé avec appareil photo */}
+          <div className="relative shrink-0">
+            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-purple-600 to-pink-500 blur-md opacity-50 group-hover:opacity-80 transition-opacity" />
+            <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-white/20 p-1 flex items-center justify-center bg-black/40">
+              <div className="w-full h-full rounded-full bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-pink-500 flex items-center justify-center text-2xl sm:text-3xl shadow-inner">
+                {uploading ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  '📸'
+                )}
               </div>
-              <span className="text-xs font-semibold text-slate-200">Appareil photo</span>
-            </label>
-
-            <label
-              htmlFor="gallery-upload"
-              className="flex flex-col items-center justify-center p-4 bg-slate-950 border border-slate-800 hover:border-purple-500 rounded-xl cursor-pointer transition text-center group active:scale-95"
-            >
-              <div className="w-10 h-10 mb-2 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <span className="text-xs font-semibold text-slate-200">Galerie photos</span>
-            </label>
+            </div>
           </div>
 
-          {/* Récapitulatif visuel */}
-          {selectedFiles.length > 0 && (
-            <div className="flex justify-between items-center bg-slate-950/60 border border-slate-800 px-3 py-2 rounded-lg text-xs">
-              <span className="text-purple-300 font-medium">
-                {selectedFiles.length} photo{selectedFiles.length > 1 ? 's prêtes' : ' prête'}
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelectedFiles([])}
-                className="text-slate-500 hover:text-red-400 transition cursor-pointer"
-              >
-                Réinitialiser
-              </button>
-            </div>
-          )}
+          {/* Intitulés */}
+          <div className="text-center landscape:text-left">
+            <p className="font-bold text-base sm:text-lg text-white group-hover:text-purple-300 transition-colors leading-snug">
+              {uploading ? 'Envoi en cours...' : 'Prendre une photo'}
+            </p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              ou choisis dans ta galerie
+            </p>
+          </div>
 
-          <button
-            type="submit"
-            disabled={uploading || !eventParam || selectedFiles.length === 0}
-            className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800/40 disabled:text-slate-400 text-white font-medium rounded-lg transition duration-200 cursor-pointer shadow-lg hover:shadow-purple-500/25 flex items-center justify-center"
-          >
-            {uploading ? 'Téléversement en cours...' : `Envoyer ${selectedFiles.length > 0 ? `(${selectedFiles.length})` : ''}`}
-          </button>
-        </form>
-      )}
-    </div>
+          {/* Input universel (pas de capture forcé = accès complet caméra + galerie) */}
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleFileUpload}
+            disabled={uploading || !eventParam}
+            className="hidden"
+          />
+        </label>
+
+        {/* Footer */}
+        <p className="text-[10px] text-slate-500 font-medium mt-6">
+          Propulsé par <span className="text-slate-400 font-semibold tracking-wide">KlicEvent</span>
+        </p>
+      </div>
+    </main>
   );
 }
 
 export default function UploadPage() {
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6">
-      <Suspense fallback={<p className="text-purple-400 animate-pulse">Chargement...</p>}>
-        <UploadContent />
-      </Suspense>
-    </main>
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#07050f] text-white flex items-center justify-center p-6">
+          <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+        </main>
+      }
+    >
+      <UploadContent />
+    </Suspense>
   );
 }
