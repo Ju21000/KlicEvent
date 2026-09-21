@@ -12,33 +12,29 @@ function UploadContent() {
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
-  const [selectedCount, setSelectedCount] = useState(0);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
+  // Gestion de la sélection (cumule ou remplace les fichiers choisis)
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setSelectedCount(e.target.files.length);
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files).filter(file => file.type.startsWith('image/'));
+      setSelectedFiles(prev => [...prev, ...newFiles]);
     }
   };
 
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!eventParam) return;
+    if (!eventParam || selectedFiles.length === 0) return;
 
     setUploading(true);
     setError('');
 
-    const files = fileInputRef.current?.files;
-
-    if (!files || files.length === 0) {
-      setUploading(false);
-      return;
-    }
-
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
         const fileExt = file.name.split('.').pop() || 'jpg';
         const fileName = `${eventParam}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
@@ -59,7 +55,7 @@ function UploadContent() {
 
         const photoUrl = publicUrlData.publicUrl;
 
-        // 3. Enregistrement en base de données
+        // 3. Insertion en base de données
         const { error: dbError } = await supabase
           .from('photos')
           .insert([{ event_slug: eventParam, url: photoUrl }]);
@@ -71,8 +67,9 @@ function UploadContent() {
       }
 
       setSuccess(true);
-      setSelectedCount(0);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      setSelectedFiles([]);
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
     } catch (err: any) {
       setError(err.message || 'Erreur lors du téléversement des photos.');
     } finally {
@@ -108,7 +105,7 @@ function UploadContent() {
           </button>
         </div>
       ) : (
-        <form onSubmit={handleUpload} className="space-y-4">
+        <form onSubmit={handleUpload} className="space-y-5">
           {eventParam ? (
             <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-slate-300">
               Événement cible : <span className="text-purple-400 font-semibold">#{eventParam}</span>
@@ -119,47 +116,78 @@ function UploadContent() {
             </div>
           )}
 
-          <div>
-            {/* Input avec accept="image/*" sans l'attribut capture pour afficher le choix natif Caméra / Galerie */}
-            <input
-              ref={fileInputRef}
-              id="photos"
-              name="photos"
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-              disabled={uploading || !eventParam}
-            />
+          {/* Deux inputs invisibles spécialisés */}
+          <input
+            ref={cameraInputRef}
+            id="camera-upload"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileChange}
+            className="hidden"
+            disabled={uploading || !eventParam}
+          />
+          <input
+            ref={galleryInputRef}
+            id="gallery-upload"
+            type="file"
+            multiple
+            accept="image/*"
+            onChange={handleFileChange}
+            className="hidden"
+            disabled={uploading || !eventParam}
+          />
 
+          {/* Les 2 boutons d'action mobile */}
+          <div className="grid grid-cols-2 gap-3">
             <label
-              htmlFor="photos"
-              className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-700 hover:border-purple-500 bg-slate-950 rounded-xl cursor-pointer transition group text-center"
+              htmlFor="camera-upload"
+              className="flex flex-col items-center justify-center p-4 bg-slate-950 border border-slate-800 hover:border-purple-500 rounded-xl cursor-pointer transition text-center group active:scale-95"
             >
-              <div className="w-12 h-12 mb-3 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-10 h-10 mb-2 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </div>
-              <span className="text-sm font-medium text-slate-200">
-                Prendre une photo ou choisir dans la galerie
-              </span>
-              <span className="text-xs text-slate-500 mt-1">
-                {selectedCount > 0
-                  ? `${selectedCount} photo${selectedCount > 1 ? 's sélectionnées' : ' sélectionnée'}`
-                  : 'Sélection multiple autorisée'}
-              </span>
+              <span className="text-xs font-semibold text-slate-200">Appareil photo</span>
+            </label>
+
+            <label
+              htmlFor="gallery-upload"
+              className="flex flex-col items-center justify-center p-4 bg-slate-950 border border-slate-800 hover:border-purple-500 rounded-xl cursor-pointer transition text-center group active:scale-95"
+            >
+              <div className="w-10 h-10 mb-2 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <span className="text-xs font-semibold text-slate-200">Galerie photos</span>
             </label>
           </div>
 
+          {/* Récapitulatif visuel */}
+          {selectedFiles.length > 0 && (
+            <div className="flex justify-between items-center bg-slate-950/60 border border-slate-800 px-3 py-2 rounded-lg text-xs">
+              <span className="text-purple-300 font-medium">
+                {selectedFiles.length} photo{selectedFiles.length > 1 ? 's prêtes' : ' prête'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedFiles([])}
+                className="text-slate-500 hover:text-red-400 transition cursor-pointer"
+              >
+                Réinitialiser
+              </button>
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={uploading || !eventParam || selectedCount === 0}
+            disabled={uploading || !eventParam || selectedFiles.length === 0}
             className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800/40 disabled:text-slate-400 text-white font-medium rounded-lg transition duration-200 cursor-pointer shadow-lg hover:shadow-purple-500/25 flex items-center justify-center"
           >
-            {uploading ? 'Téléversement en cours...' : 'Envoyer les photos'}
+            {uploading ? 'Téléversement en cours...' : `Envoyer ${selectedFiles.length > 0 ? `(${selectedFiles.length})` : ''}`}
           </button>
         </form>
       )}
